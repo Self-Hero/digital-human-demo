@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.uv-cache/
+
+# Node
+node_modules/
+.npm-cache/
+.tools/
+dist/
+
+# Local configuration
+.env
+!.env.example
+
+# Runtime data
+data/
+logs/
+*.log
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
