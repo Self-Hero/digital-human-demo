@@ -4,9 +4,21 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 
 from app.container import container
+from app.core.config import get_settings
+from app.providers.bailian_realtime import BailianRealtimeBridge
 from app.services.sessions import new_turn_id
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+@router.websocket("/{session_id}/realtime")
+async def session_realtime(websocket: WebSocket, session_id: str) -> None:
+    if container.sessions.get(session_id) is None:
+        await websocket.close(code=4404, reason="Session not found")
+        return
+
+    await websocket.accept()
+    await BailianRealtimeBridge(get_settings()).run(websocket)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

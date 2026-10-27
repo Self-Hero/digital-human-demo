@@ -2,7 +2,7 @@ import type { SessionState, TurnMetrics } from "../types/conversation";
 
 const stateLabels: Record<SessionState, string> = {
   connecting: "正在连接",
-  idle: "等待提问",
+  idle: "等待开启麦克风",
   listening: "正在聆听",
   thinking: "正在思考",
   speaking: "正在回答",
@@ -23,14 +23,14 @@ export function DigitalHumanStage({ state, metrics }: Props) {
           <span className="eye right" />
           <span className="mouth" />
         </div>
-        <p>数字人模型将在后续阶段接入</p>
+        <p>MuseTalk 数字人将在下一阶段接入</p>
       </div>
       <div className="stage-status">
         <span className={`status-dot state-${state}`} />
         <strong>{stateLabels[state]}</strong>
         {metrics && (
           <span className="metrics">
-            首字 {metrics.firstDeltaMs ?? "—"} ms · 整轮 {metrics.totalMs} ms
+            首段音频 {metrics.firstAudioMs ?? "—"} ms · 完整响应 {metrics.totalMs} ms
           </span>
         )}
       </div>

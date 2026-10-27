@@ -1,12 +1,11 @@
-import { FormEvent, useState } from "react";
-
 import type { SessionState, TranscriptItem } from "../types/conversation";
 
 interface Props {
   state: SessionState;
   transcript: TranscriptItem[];
   error: string | null;
-  onSend: (text: string) => boolean;
+  microphoneActive: boolean;
+  onToggleMicrophone: () => Promise<void>;
   onInterrupt: () => void;
 }
 
@@ -14,24 +13,16 @@ export function ConversationPanel({
   state,
   transcript,
   error,
-  onSend,
+  microphoneActive,
+  onToggleMicrophone,
   onInterrupt,
 }: Props) {
-  const [text, setText] = useState("");
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    const value = text.trim();
-    if (!value) return;
-    if (onSend(value)) setText("");
-  }
-
   return (
     <section className="conversation-panel">
       <header>
         <div>
-          <p className="eyebrow">DEMO CONTROL</p>
-          <h2>对话调试台</h2>
+          <p className="eyebrow">REALTIME AUDIO</p>
+          <h2>实时语音对话</h2>
         </div>
         <button
           className="interrupt-button"
@@ -39,14 +30,14 @@ export function ConversationPanel({
           onClick={onInterrupt}
           disabled={state !== "thinking" && state !== "speaking"}
         >
-          打断
+          打断回答
         </button>
       </header>
 
       <div className="transcript" aria-live="polite">
         {transcript.length === 0 ? (
           <div className="empty-transcript">
-            输入一段文字，验证模拟的流式LLM、TTS和数字人编排链路。
+            点击“开启麦克风”后直接说话。停顿约半秒，数字人就会开始回答。
           </div>
         ) : (
           transcript.map((item) => (
@@ -60,18 +51,20 @@ export function ConversationPanel({
 
       {error && <div className="error-banner">{error}</div>}
 
-      <form className="composer" onSubmit={submit}>
-        <input
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder="先用文字模拟用户语音，例如：介绍一下这个Demo"
-          disabled={state === "connecting" || state === "error"}
-        />
-        <button type="submit" disabled={!text.trim() || state === "connecting"}>
-          发送
+      <div className="voice-controls">
+        <button
+          className={`microphone-button ${microphoneActive ? "active" : ""}`}
+          type="button"
+          onClick={() => void onToggleMicrophone()}
+          disabled={state === "connecting"}
+        >
+          <span className="microphone-indicator" />
+          {microphoneActive ? "关闭麦克风" : "开启麦克风"}
         </button>
-      </form>
-      <p className="hint">麦克风、真实云API和MuseTalk将在后续阶段逐步接入。</p>
+      </div>
+      <p className="hint">
+        请使用耳机或开启系统回声消除。API Key 只保存在后端，不会发送到浏览器。
+      </p>
     </section>
   );
 }

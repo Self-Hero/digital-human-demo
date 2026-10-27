@@ -13,7 +13,7 @@ export interface TranscriptItem {
 }
 
 export interface TurnMetrics {
-  firstDeltaMs: number | null;
+  firstAudioMs: number | null;
   totalMs: number;
 }
 
@@ -24,6 +24,10 @@ export interface ServerEvent {
   state?: SessionState;
   text?: string;
   delta?: string;
+  audio?: string;
+  sampleRate?: number;
+  inputSampleRate?: number;
+  outputSampleRate?: number;
   message?: string;
   metrics?: TurnMetrics;
 }

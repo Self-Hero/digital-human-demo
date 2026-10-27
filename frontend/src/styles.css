@@ -193,7 +193,8 @@ h2 {
 }
 
 .status-dot.state-thinking,
-.status-dot.state-speaking {
+.status-dot.state-speaking,
+.status-dot.state-listening {
   background: #56a8ff;
   box-shadow: 0 0 16px currentColor;
 }
@@ -324,6 +325,42 @@ h2 {
   font-size: 12px;
 }
 
+.voice-controls {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.microphone-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 190px;
+  padding: 14px 22px;
+  border: 1px solid rgba(90, 169, 255, 0.42);
+  border-radius: 999px;
+  color: #eaf4ff;
+  background: linear-gradient(135deg, #176fcf, #168d78);
+  box-shadow: 0 12px 30px rgba(17, 104, 191, 0.2);
+}
+
+.microphone-button.active {
+  border-color: rgba(255, 107, 118, 0.55);
+  background: linear-gradient(135deg, #a93245, #cb5e50);
+}
+
+.microphone-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.microphone-button.active .microphone-indicator {
+  animation: microphone-pulse 1s infinite ease-in-out;
+}
+
 @keyframes speaking-mouth {
   from {
     height: 5px;
@@ -339,6 +376,13 @@ h2 {
   }
   to {
     box-shadow: 0 0 90px rgba(39, 140, 250, 0.35);
+  }
+}
+
+@keyframes microphone-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
   }
 }
 

@@ -16,8 +16,12 @@ def test_health_reports_mock_providers() -> None:
 
 def test_bailian_realtime_defaults() -> None:
     settings = Settings(_env_file=None)
+    assert settings.bailian_base_url.endswith("/compatible-mode/v1")
+    assert settings.bailian_realtime_url == (
+        "wss://token-plan.maas.qianwenaiapi.com/api-ws/v1/realtime"
+    )
     assert settings.bailian_realtime_model == "qwen-audio-3.0-realtime-plus"
-    assert settings.bailian_realtime_voice == "Cherry"
+    assert settings.bailian_realtime_voice == "longanqian"
 
 
 def test_session_lifecycle() -> None:

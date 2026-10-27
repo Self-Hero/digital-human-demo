@@ -12,7 +12,7 @@ export default function App() {
           <p className="eyebrow">REALTIME DIGITAL HUMAN</p>
           <h1>实时数字人交互 Demo</h1>
         </div>
-        <div className="architecture-pill">LiveTalking · MuseTalk · Cloud AI</div>
+        <div className="architecture-pill">Bailian Realtime · MuseTalk</div>
       </header>
 
       <div className="workspace">
@@ -24,7 +24,8 @@ export default function App() {
           state={conversation.state}
           transcript={conversation.transcript}
           error={conversation.error}
-          onSend={conversation.sendText}
+          microphoneActive={conversation.microphoneActive}
+          onToggleMicrophone={conversation.toggleMicrophone}
           onInterrupt={conversation.interrupt}
         />
       </div>

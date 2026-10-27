@@ -18,6 +18,10 @@ dist/
 # Runtime data
 data/
 logs/
+output/
+.review/
+assets/source/
+assets/avatar/
 *.log
 
 # Editors and operating systems

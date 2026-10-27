@@ -19,3 +19,9 @@ export function sessionWebSocketUrl(sessionId: string): string {
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();
 }
+
+export function realtimeWebSocketUrl(sessionId: string): string {
+  const url = new URL(`${apiBaseUrl}/sessions/${sessionId}/realtime`);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+}

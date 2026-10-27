@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,10 +16,12 @@ class Settings(BaseSettings):
     tts_provider: str = "mock"
     avatar_provider: str = "mock"
 
-    bailian_base_url: str = "https://dashscope.aliyuncs.com"
+    bailian_base_url: str = (
+        "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1"
+    )
     bailian_api_key: str = ""
     bailian_realtime_model: str = "qwen-audio-3.0-realtime-plus"
-    bailian_realtime_voice: str = "Cherry"
+    bailian_realtime_voice: str = "longanqian"
 
     llm_timeout_seconds: float = 30.0
     llm_system_prompt: str = "你是一个简洁、自然的中文数字人助手。"
@@ -32,6 +35,13 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @property
+    def bailian_realtime_url(self) -> str:
+        """Derive the Realtime WebSocket endpoint from the configured API base."""
+        parsed = urlsplit(self.bailian_base_url)
+        scheme = "wss" if parsed.scheme == "https" else "ws"
+        return urlunsplit((scheme, parsed.netloc, "/api-ws/v1/realtime", "", ""))
 
 
 @lru_cache
