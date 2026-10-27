@@ -6,8 +6,8 @@
 
 - `frontend/`：React + TypeScript + Vite 调试界面。
 - `backend/`：FastAPI、WebSocket、会话状态和中断控制。
-- `backend/app/providers/`：可替换的 ASR、LLM、TTS、Avatar 接口。
-- 当前使用 Mock LLM、Mock TTS 和 Mock Avatar，不需要 API Key 或 GPU。
+- `backend/app/providers/`：端到端实时语音与 Avatar 的可替换接口；原 ASR、LLM、TTS 接口作为备用。
+- 当前使用 Mock 对话链路和 Mock Avatar，不需要 API Key 或 GPU。
 - `docs/IMPLEMENTATION_PLAN.md`：按阶段接入真实云 API 和 MuseTalk 的实施计划。
 
 后端本地启动：
@@ -37,31 +37,27 @@ npm run dev
 - 口型模型：MuseTalk
 - GPU：单张 NVIDIA RTX 4090 24GB
 - 数字人数量：1 个固定真人数字人
-- ASR：线上流式语音识别 API
-- LLM：线上流式大模型 API
-- TTS：线上流式语音合成 API
+- 实时语音：百炼 `qwen-audio-3.0-realtime-plus`，端到端语音输入和语音输出
 - 输出：WebRTC，720p、25 FPS
 - 性能目标：用户说完后 3 秒内数字人开始发声并出现同步口型
 
-Demo 阶段不部署本地 ASR、LLM、TTS，不使用 Kubernetes，也不做多数字人并发。RTX 4090 专门承担 MuseTalk 推理、画面合成和视频编码。
+Demo 阶段不部署本地语音或语言模型，不使用 Kubernetes，也不做多数字人并发。RTX 4090 专门承担 MuseTalk 推理、画面合成和视频编码。
 
 ## 2. 总体架构
 
 ```text
 浏览器前端
 ├─ 麦克风采集、AEC 回声消除、降噪
-├─ 用户字幕、数字人字幕和状态展示
-├─ WebSocket：控制消息、ASR 文本、会话事件
+├─ 用户字幕、数字人字幕和状态展示（接口支持时）
+├─ WebSocket：控制消息、麦克风音频、会话事件
 └─ WebRTC：数字人音视频播放
              │
              ▼
 API 网关 / 对话编排服务（FastAPI）
 ├─ 会话、turnId、取消与打断控制
-├─ VAD 和音频分片
-├─ 线上流式 ASR 适配器
-├─ 线上流式 LLM 适配器
-├─ 文本分句器
-├─ 线上流式 TTS 适配器
+├─ 百炼 Realtime WebSocket 适配器
+├─ 麦克风音频上行和回复音频下行
+├─ 字幕事件、取消和用户插话
 └─ 音频队列、指标与日志
              │ 流式 PCM 音频
              ▼
@@ -77,7 +73,7 @@ LiveTalking + MuseTalk Worker
 浏览器播放
 ```
 
-音频是同步主时钟。每个音频分片必须携带 `sessionId`、`turnId` 和递增的 `sequence`；视频帧按照音频播放时间生成和发送。发生用户打断时，旧 `turnId` 的 LLM、TTS、音频队列和视频帧全部作废。
+回复音频是同步主时钟。每个音频分片必须携带 `sessionId`、`turnId` 和递增的 `sequence`；视频帧按照音频播放时间生成和发送。发生用户打断时，旧 `turnId` 的实时回复、音频队列和视频帧全部作废。
 
 ## 3. 三秒延迟设计
 
@@ -86,24 +82,21 @@ LiveTalking + MuseTalk Worker
 | 环节 | P95 预算 |
 |---|---:|
 | VAD 判断用户说完 | 300～600 ms |
-| ASR 最终结果 | 150～350 ms |
-| LLM 生成首个可播短句 | 250～700 ms |
-| TTS 返回首段 PCM | 200～500 ms |
+| 百炼实时模型返回首段音频 | 400～1,200 ms |
 | MuseTalk 首批画面与播放缓冲 | 200～450 ms |
 | WebRTC 网络与解码 | 100～250 ms |
-| 目标总计 | 1.2～2.85 s |
+| 目标总计 | 1.0～2.5 s |
 
 必须满足以下工程条件：
 
-1. ASR、LLM、TTS 都采用流式接口，不能等待完整结果。
-2. LLM 输出达到自然短语即可送入 TTS。中文建议以标点为主，并在约 12～30 个汉字时允许软切分。
-3. TTS 必须支持低首包延迟，优先返回 PCM；不要等待完整 MP3 文件生成。
-4. TTS 音频统一转换为 MuseTalk 所需的单声道 PCM 格式，内部建议以 16 kHz 音频进入口型模型。
+1. 浏览器和百炼之间保持双向实时音频流，不能等待完整录音或完整回复。
+2. 百炼返回的音频分片立即进入播放队列和 MuseTalk，不能等待完整回答。
+3. 回复音频统一转换为 MuseTalk 所需的单声道 PCM 格式；最终采样率按接口实测确定。
 5. MuseTalk 模型和数字人素材必须在服务启动时加载，并常驻 GPU，不能每轮会话重新加载。
 6. 数字人素材在部署前完成人脸检测、裁剪、蒙版、特征和帧缓存预处理。
 7. 初始音视频缓冲控制在约 100～180 ms；以音频为主时钟，视频来不及时丢弃过期帧，不暂停音频等待画面。
 8. GPU 编码使用 NVENC，避免 CPU 软件编码成为瓶颈。
-9. 云 ASR、LLM、TTS 选择同一地域或网络 RTT 较低的服务。
+9. GPU服务器应选择与百炼中国大陆端点网络 RTT 较低的地域。
 10. 前端开启浏览器 AEC，否则数字人的扬声器声音可能再次进入 ASR。
 
 补充指标：
@@ -204,7 +197,7 @@ idle → listening → thinking → speaking
 Demo 阶段同一台服务器部署，但保持逻辑进程分离：
 
 1. `web`：前端静态资源和反向代理。
-2. `api-orchestrator`：FastAPI，会话、鉴权、ASR/LLM/TTS 适配、分句、取消和日志。
+2. `api-orchestrator`：FastAPI，会话、鉴权、百炼Realtime适配、取消和日志。
 3. `livetalking`：WebRTC 会话、音视频队列和 Avatar 接口。
 4. `musetalk-worker`：模型常驻显存，单数字人串行消费音频任务。
 5. `coturn`：需要公网穿透时启用。
@@ -223,21 +216,22 @@ POST /internal/avatar/stop
 GET  /internal/avatar/health
 ```
 
-线上模型供应商通过适配器隔离：
+百炼端到端实时模型通过适配器隔离：
 
 ```text
-StreamingASR.transcribe(audio_stream)
-StreamingLLM.generate(messages, cancel_token)
-StreamingTTS.synthesize(text_chunks, cancel_token)
+RealtimeAudio.connect(session)
+RealtimeAudio.push_audio(audio_chunk)
+RealtimeAudio.events()
+RealtimeAudio.interrupt(turn_id)
 ```
 
-这样后续更换阿里、火山、腾讯、讯飞或其他兼容服务时，不需要修改 MuseTalk 和前端。
+这样实时模型协议与 MuseTalk、前端解耦，必要时仍可切回独立 ASR、LLM、TTS 链路。
 
 ### 队列与背压
 
 - 每次回答创建新的 `turnId`。
-- LLM 文本、TTS 音频和视频帧都绑定同一个 `turnId`。
-- TTS 音频队列只允许保留少量未来音频，建议不超过 1～2 秒，避免打断迟钝。
+- 百炼回复音频和视频帧都绑定同一个 `turnId`。
+- 回复音频队列只允许保留少量未来音频，建议不超过 1～2 秒，避免打断迟钝。
 - GPU Worker 只处理当前有效轮次；检测到取消后立即丢弃旧任务。
 - 音频播放进度是主时钟，视频帧按时间戳匹配。
 - 云 API 超时应快速失败并返回可理解的前端状态，不允许无限重试。
@@ -266,21 +260,20 @@ StreamingTTS.synthesize(text_chunks, cancel_token)
 
 ### 线上服务
 
-- ASR 必须支持实时音频上传和中间/最终识别结果。
-- LLM 必须支持 SSE 或 WebSocket 流式输出。
-- TTS 必须支持流式合成和低首包延迟，优先 PCM 输出。
-- 三类服务尽量选择相同地域，并分别记录首包、完整请求、错误率和限流指标。
+- `qwen-audio-3.0-realtime-plus` 必须通过 WebSocket 持续接收麦克风音频并返回回复音频流。
+- 实测接口是否返回用户和助手字幕、回复音频格式、采样率及可选音色。
+- 记录连接耗时、首段回复音频、整轮耗时、错误率和限流指标。
 - API Key 只保存在后端密钥管理或环境变量中，绝不能下发浏览器。
 
 ### 供应商选择验收表
 
 不要只比较单价，至少实测：
 
-| 服务 | 必测项目 |
+| 能力 | 必测项目 |
 |---|---|
-| ASR | 中文准确率、流式首结果、最终结果延迟、热词、噪声环境、断线重连 |
-| LLM | 首 Token、首个完整短句、并发限制、上下文长度、取消请求是否及时生效 |
-| TTS | 首段 PCM 延迟、是否真正流式、音质、停顿自然度、可否立即取消、采样率 |
+| 输入 | 中文识别效果、噪声环境、AEC、服务端VAD、字幕事件 |
+| 对话 | 回答质量、上下文、系统提示词、打断是否及时生效 |
+| 输出 | 首段音频延迟、音质、音色、PCM格式、采样率、字幕事件 |
 
 ## 9. 开源项目地址
 
@@ -313,15 +306,15 @@ StreamingTTS.synthesize(text_chunks, cancel_token)
 - 浏览器稳定播放 720p/25 FPS 音视频。
 - 验证公网 HTTPS、WebRTC 和必要的 TURN 回落。
 
-### 第 3 步：线上 TTS
+### 第 3 步：百炼端到端实时语音
 
-- 先用固定文本测试流式 TTS 到口型的完整链路。
-- 重点测 TTS 首包、音画同步、分片边界爆音和打断。
+- 接入 `qwen-audio-3.0-realtime-plus` 双向WebSocket。
+- 先验证麦克风语音输入和回复音频输出，再把回复音频送入MuseTalk。
+- 重点测首包、字幕事件、音画同步、分片边界和打断。
 
-### 第 4 步：线上 LLM 和 ASR
+### 第 4 步：联调和优化
 
-- 接入流式 LLM 和分句器。
-- 最后接入流式 ASR、VAD、AEC 和用户打断。
+- 接入AEC、会话状态、字幕和用户打断。
 - 端到端压测 P50、P95 和失败率。
 
 ### 第 5 步：Demo 验收

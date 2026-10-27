@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.config import Settings
 from app.main import app
 
 
@@ -11,6 +12,12 @@ def test_health_reports_mock_providers() -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["providers"]["avatar"] == "mock"
+
+
+def test_bailian_realtime_defaults() -> None:
+    settings = Settings(_env_file=None)
+    assert settings.bailian_realtime_model == "qwen-audio-3.0-realtime-plus"
+    assert settings.bailian_realtime_voice == "Cherry"
 
 
 def test_session_lifecycle() -> None:
