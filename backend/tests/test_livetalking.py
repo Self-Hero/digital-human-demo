@@ -18,3 +18,19 @@ def test_pcm_is_wrapped_as_mono_24khz_wav() -> None:
         assert wav_file.getnframes() == 2_400
 
     asyncio.run(sink.close())
+
+
+def test_audio_chunks_have_musetalk_compatible_minimum_duration() -> None:
+    sink = LiveTalkingAudioSink(Settings(livetalking_audio_chunk_ms=400))
+
+    assert sink._chunk_bytes == 24_000 * 2 * 2
+
+    asyncio.run(sink.close())
+
+
+def test_longer_configured_audio_chunks_are_preserved() -> None:
+    sink = LiveTalkingAudioSink(Settings(livetalking_audio_chunk_ms=3_000))
+
+    assert sink._chunk_bytes == 24_000 * 2 * 3
+
+    asyncio.run(sink.close())

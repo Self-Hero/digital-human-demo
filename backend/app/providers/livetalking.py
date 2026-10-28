@@ -16,8 +16,11 @@ class LiveTalkingAudioSink:
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.livetalking_base_url.rstrip("/")
         self._sample_rate = 24_000
+        # LiveTalking treats every upload as a standalone audio segment. Very
+        # short WAV files do not reliably switch MuseTalk out of its idle loop.
+        chunk_ms = max(2_000, settings.livetalking_audio_chunk_ms)
         self._chunk_bytes = (
-            self._sample_rate * 2 * settings.livetalking_audio_chunk_ms // 1000
+            self._sample_rate * 2 * chunk_ms // 1000
         )
         self._session_id: str | None = None
         self._buffer = bytearray()
