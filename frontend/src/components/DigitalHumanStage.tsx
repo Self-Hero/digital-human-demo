@@ -30,7 +30,7 @@ interface Props {
 export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE ?? "/avatar-idle.jpg";
+  const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE;
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = avatar.videoStream;
@@ -44,16 +44,18 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
     <section className="stage" aria-label="数字人预览区">
       <div className={`avatar-video-shell state-${state}`}>
         <video className="avatar-live-video" ref={videoRef} autoPlay playsInline muted />
-        <img
-          className={`avatar-idle-image${avatar.playbackSpeaking ? " is-hidden" : ""}`}
-          src={idleImage}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          onError={(event) => {
-            event.currentTarget.hidden = true;
-          }}
-        />
+        {idleImage && (
+          <img
+            className={`avatar-idle-image${avatar.playbackSpeaking ? " is-hidden" : ""}`}
+            src={idleImage}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            onError={(event) => {
+              event.currentTarget.hidden = true;
+            }}
+          />
+        )}
         <audio ref={audioRef} autoPlay />
         {avatar.connectionState !== "connected" && (
           <div className="avatar-connect-panel">

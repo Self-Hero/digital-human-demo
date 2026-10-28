@@ -28,9 +28,7 @@ class Settings(BaseSettings):
     )
 
     livetalking_base_url: str = "http://127.0.0.1:8010"
-    # Keep a normal response in one segment so MuseTalk gets continuous audio
-    # features instead of restarting its context every two seconds.
-    livetalking_audio_chunk_ms: int = 60_000
+    livetalking_audio_chunk_ms: int = 2_000
 
     llm_timeout_seconds: float = 30.0
     llm_system_prompt: str = "你是一个简洁、自然的中文数字人助手。"
