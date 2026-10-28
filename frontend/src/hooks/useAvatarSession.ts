@@ -85,7 +85,7 @@ export function useAvatarSession() {
         body: JSON.stringify({
           sdp: peer.localDescription?.sdp,
           type: peer.localDescription?.type,
-          avatar: import.meta.env.VITE_AVATAR_ID ?? "ma_renda",
+          avatar: import.meta.env.VITE_AVATAR_ID ?? "ma_renda_still",
         }),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
