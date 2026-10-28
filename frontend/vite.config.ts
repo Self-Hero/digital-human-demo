@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      "/avatar-api": {
+        target: "http://127.0.0.1:8010",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/avatar-api/, ""),
+      },
     },
   },
   preview: {
@@ -22,6 +27,11 @@ export default defineConfig({
         target: "http://127.0.0.1:8001",
         changeOrigin: true,
         ws: true,
+      },
+      "/avatar-api": {
+        target: "http://127.0.0.1:8010",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/avatar-api/, ""),
       },
     },
   },

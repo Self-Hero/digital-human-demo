@@ -1,9 +1,11 @@
 import { ConversationPanel } from "./components/ConversationPanel";
 import { DigitalHumanStage } from "./components/DigitalHumanStage";
+import { useAvatarSession } from "./hooks/useAvatarSession";
 import { useConversation } from "./hooks/useConversation";
 
 export default function App() {
   const conversation = useConversation();
+  const avatar = useAvatarSession();
 
   return (
     <main className="app-shell">
@@ -19,6 +21,7 @@ export default function App() {
         <DigitalHumanStage
           state={conversation.state}
           metrics={conversation.metrics}
+          avatar={avatar}
         />
         <ConversationPanel
           state={conversation.state}

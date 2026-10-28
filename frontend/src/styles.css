@@ -121,6 +121,58 @@ h2 {
   background: radial-gradient(circle, rgba(27, 92, 153, 0.2), transparent 52%);
 }
 
+.avatar-video-shell {
+  position: relative;
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(109, 170, 244, 0.18);
+  border-radius: 18px;
+  background: #050b12;
+}
+
+.avatar-video-shell video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.avatar-connect-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  color: #a9bed6;
+  background: rgba(5, 11, 18, 0.82);
+}
+
+.avatar-connect-panel p {
+  margin: 0;
+}
+
+.primary-button {
+  min-width: 132px;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid #4ca7ff;
+  border-radius: 7px;
+  color: #f5f9ff;
+  background: #176fc2;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #2081d8;
+}
+
+.avatar-session {
+  color: #78ddb9;
+  font-size: 0.84rem;
+}
+
 .avatar-face {
   position: relative;
   width: 180px;
