@@ -4,8 +4,8 @@ import { useAvatarSession } from "./hooks/useAvatarSession";
 import { useConversation } from "./hooks/useConversation";
 
 export default function App() {
-  const conversation = useConversation();
   const avatar = useAvatarSession();
+  const conversation = useConversation(avatar.sessionId);
 
   return (
     <main className="app-shell">

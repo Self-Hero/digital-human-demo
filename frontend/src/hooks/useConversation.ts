@@ -47,7 +47,7 @@ function downsampleToPcm16(input: Float32Array, inputRate: number): Uint8Array {
   return new Uint8Array(buffer);
 }
 
-export function useConversation() {
+export function useConversation(avatarSessionId: string | null) {
   const socketRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const assistantItemByTurn = useRef(new Map<string, string>());
@@ -58,6 +58,7 @@ export function useConversation() {
   const silentGainRef = useRef<GainNode | null>(null);
   const playbackSourcesRef = useRef(new Set<AudioBufferSourceNode>());
   const nextPlaybackAtRef = useRef(0);
+  const avatarSessionIdRef = useRef(avatarSessionId);
 
   const [state, setState] = useState<SessionState>("connecting");
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
@@ -136,6 +137,15 @@ export function useConversation() {
           const event = JSON.parse(message.data) as ServerEvent;
 
           if (event.type === "realtime.ready") {
+            const activeAvatarSession = avatarSessionIdRef.current;
+            if (activeAvatarSession) {
+              socket.send(
+                JSON.stringify({
+                  type: "avatar.session.attach",
+                  sessionId: activeAvatarSession,
+                }),
+              );
+            }
             setError(null);
             setState("idle");
             return;
@@ -149,7 +159,9 @@ export function useConversation() {
             return;
           }
           if (event.type === "audio.delta" && event.audio) {
-            playPcm16(event.audio, event.sampleRate ?? 24_000);
+            if (!avatarSessionIdRef.current) {
+              playPcm16(event.audio, event.sampleRate ?? 24_000);
+            }
             return;
           }
           if (event.type === "transcript.user" && event.text) {
@@ -231,6 +243,19 @@ export function useConversation() {
       if (sessionId) void deleteSession(sessionId);
     };
   }, [clearPlayback, playPcm16, releaseMicrophone]);
+
+  useEffect(() => {
+    avatarSessionIdRef.current = avatarSessionId;
+    const socket = socketRef.current;
+    if (avatarSessionId && socket?.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          type: "avatar.session.attach",
+          sessionId: avatarSessionId,
+        }),
+      );
+    }
+  }, [avatarSessionId]);
 
   const startMicrophone = useCallback(async () => {
     const socket = socketRef.current;

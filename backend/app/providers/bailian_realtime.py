@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import time
 from typing import Any
@@ -9,6 +10,7 @@ import websockets
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.core.config import Settings
+from app.providers.livetalking import LiveTalkingAudioSink
 
 
 class BailianRealtimeBridge:
@@ -30,6 +32,7 @@ class BailianRealtimeBridge:
         )
         headers = {"Authorization": f"Bearer {self._settings.bailian_api_key}"}
         send_lock = asyncio.Lock()
+        audio_sink = LiveTalkingAudioSink(self._settings)
 
         async def send(event: dict[str, Any]) -> None:
             async with send_lock:
@@ -70,9 +73,11 @@ class BailianRealtimeBridge:
                 await send({"type": "session.state", "state": "idle"})
 
                 browser_task = asyncio.create_task(
-                    self._forward_browser(browser, upstream, send)
+                    self._forward_browser(browser, upstream, send, audio_sink)
                 )
-                upstream_task = asyncio.create_task(self._forward_upstream(upstream, send))
+                upstream_task = asyncio.create_task(
+                    self._forward_upstream(upstream, send, audio_sink)
+                )
                 done, pending = await asyncio.wait(
                     {browser_task, upstream_task},
                     return_when=asyncio.FIRST_COMPLETED,
@@ -89,8 +94,12 @@ class BailianRealtimeBridge:
                 await send({"type": "error", "message": f"百炼实时连接失败：{exc}"})
             except Exception:
                 pass
+        finally:
+            await audio_sink.close()
 
-    async def _forward_browser(self, browser: WebSocket, upstream: Any, send) -> None:
+    async def _forward_browser(
+        self, browser: WebSocket, upstream: Any, send, audio_sink: LiveTalkingAudioSink
+    ) -> None:
         async for message in self._browser_messages(browser):
             message_type = message.get("type")
             if message_type == "input_audio.append":
@@ -107,8 +116,14 @@ class BailianRealtimeBridge:
                 )
             elif message_type == "turn.interrupt":
                 await upstream.send(json.dumps({"type": "response.cancel"}))
+                await audio_sink.interrupt()
                 await send({"type": "playback.clear"})
                 await send({"type": "session.state", "state": "listening"})
+            elif message_type == "avatar.session.attach":
+                session_id = str(message.get("sessionId", "")).strip()
+                if session_id:
+                    audio_sink.attach(session_id)
+                    await send({"type": "avatar.session.ready", "sessionId": session_id})
             elif message_type == "ping":
                 await send({"type": "pong"})
             elif message_type == "realtime.stop":
@@ -120,7 +135,9 @@ class BailianRealtimeBridge:
             yield await browser.receive_json()
 
     @staticmethod
-    async def _forward_upstream(upstream: Any, send) -> None:
+    async def _forward_upstream(
+        upstream: Any, send, audio_sink: LiveTalkingAudioSink | None = None
+    ) -> None:
         speech_ended_at: float | None = None
         response_started_at: float | None = None
         first_audio_ms: int | None = None
@@ -180,6 +197,10 @@ class BailianRealtimeBridge:
                         "sampleRate": 24_000,
                     }
                 )
+                if audio_sink is not None:
+                    delta = event.get("delta", "")
+                    if isinstance(delta, str) and delta:
+                        await audio_sink.append(base64.b64decode(delta))
             elif event_type == "response.audio_transcript.delta":
                 delta = str(event.get("delta", ""))
                 if delta:
@@ -199,6 +220,8 @@ class BailianRealtimeBridge:
                     }
                 )
             elif event_type == "response.done":
+                if audio_sink is not None:
+                    await audio_sink.flush()
                 now = time.perf_counter()
                 total_ms = (
                     int((now - response_started_at) * 1000)
