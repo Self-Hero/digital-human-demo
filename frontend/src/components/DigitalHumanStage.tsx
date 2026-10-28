@@ -30,7 +30,7 @@ interface Props {
 export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE ?? "/avatar-idle.png";
+  const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE ?? "/avatar-idle.jpg";
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = avatar.videoStream;
