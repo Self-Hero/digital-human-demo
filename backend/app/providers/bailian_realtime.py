@@ -53,6 +53,7 @@ class BailianRealtimeBridge:
                             "session": {
                                 "modalities": ["text", "audio"],
                                 "voice": self._settings.bailian_realtime_voice,
+                                "instructions": self._settings.bailian_realtime_instructions,
                                 "turn_detection": {
                                     "type": "server_vad",
                                     "threshold": 0.5,

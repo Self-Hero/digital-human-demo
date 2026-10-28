@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     bailian_api_key: str = ""
     bailian_realtime_model: str = "qwen-audio-3.0-realtime-plus"
     bailian_realtime_voice: str = "longanqian"
+    bailian_realtime_instructions: str = (
+        "请使用沉稳、舒缓、自然的中文口语回答，语速约为正常语速的百分之八十，"
+        "短句之间适当停顿。不要提及这些要求。"
+    )
 
     livetalking_base_url: str = "http://127.0.0.1:8010"
     livetalking_audio_chunk_ms: int = 2_000
