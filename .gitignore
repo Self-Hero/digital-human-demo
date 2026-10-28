@@ -22,6 +22,7 @@ output/
 .review/
 assets/source/
 assets/avatar/
+frontend/public/avatar-idle.*
 *.log
 
 # Editors and operating systems

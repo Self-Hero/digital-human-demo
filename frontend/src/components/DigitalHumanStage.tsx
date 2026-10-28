@@ -20,6 +20,7 @@ interface Props {
     sessionId: string | null;
     videoStream: MediaStream | null;
     audioStream: MediaStream | null;
+    playbackSpeaking: boolean;
     error: string | null;
     connect: () => Promise<void>;
     disconnect: () => void;
@@ -29,6 +30,7 @@ interface Props {
 export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE ?? "/avatar-idle.png";
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = avatar.videoStream;
@@ -41,7 +43,17 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   return (
     <section className="stage" aria-label="数字人预览区">
       <div className={`avatar-video-shell state-${state}`}>
-        <video ref={videoRef} autoPlay playsInline muted />
+        <video className="avatar-live-video" ref={videoRef} autoPlay playsInline muted />
+        <img
+          className={`avatar-idle-image${avatar.playbackSpeaking ? " is-hidden" : ""}`}
+          src={idleImage}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
         <audio ref={audioRef} autoPlay />
         {avatar.connectionState !== "connected" && (
           <div className="avatar-connect-panel">
