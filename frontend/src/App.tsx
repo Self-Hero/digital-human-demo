@@ -1,5 +1,6 @@
 import { ConversationPanel } from "./components/ConversationPanel";
 import { DigitalHumanStage } from "./components/DigitalHumanStage";
+import { VoiceControls } from "./components/VoiceControls";
 import { useAvatarSession } from "./hooks/useAvatarSession";
 import { useConversation } from "./hooks/useConversation";
 
@@ -26,15 +27,16 @@ export default function App() {
           metrics={conversation.metrics}
           avatar={avatar}
         />
-        <ConversationPanel
+        <VoiceControls
           state={conversation.state}
-          transcript={conversation.transcript}
           error={conversation.error}
           microphoneActive={conversation.microphoneActive}
           onToggleMicrophone={conversation.toggleMicrophone}
           onInterrupt={conversation.interrupt}
         />
       </div>
+
+      <ConversationPanel transcript={conversation.transcript} />
     </main>
   );
 }

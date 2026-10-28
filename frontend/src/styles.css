@@ -84,8 +84,8 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(380px, 0.8fr);
-  min-height: 680px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: calc(100dvh - 160px);
   border: 1px solid rgba(115, 161, 218, 0.18);
   border-radius: 24px;
   overflow: hidden;
@@ -96,9 +96,8 @@ h2 {
 .stage {
   display: flex;
   flex-direction: column;
-  min-height: 680px;
-  padding: 28px;
-  border-right: 1px solid rgba(115, 161, 218, 0.16);
+  min-height: 0;
+  padding: 24px 24px 0;
   background:
     linear-gradient(rgba(8, 21, 37, 0.2), rgba(8, 21, 37, 0.72)),
     repeating-linear-gradient(
@@ -291,8 +290,12 @@ h2 {
 .conversation-panel {
   display: flex;
   flex-direction: column;
-  min-height: 680px;
+  min-height: calc(100dvh - 64px);
+  margin-top: 32px;
   padding: 28px;
+  border: 1px solid rgba(115, 161, 218, 0.18);
+  border-radius: 24px;
+  background: rgba(9, 21, 36, 0.82);
 }
 
 .conversation-panel > header {
@@ -313,10 +316,8 @@ h2 {
 
 .transcript {
   flex: 1;
-  height: 0;
-  min-height: 360px;
+  min-height: 420px;
   padding: 22px 4px;
-  overflow-y: auto;
 }
 
 .empty-transcript {
@@ -361,7 +362,7 @@ h2 {
 }
 
 .error-banner {
-  margin-bottom: 12px;
+  margin: 12px 0 0;
   padding: 10px 12px;
   border: 1px solid rgba(255, 107, 118, 0.3);
   border-radius: 10px;
@@ -398,16 +399,22 @@ h2 {
   background: linear-gradient(135deg, #1870cf, #1aa987);
 }
 
-.hint {
-  margin: 10px 2px 0;
-  color: #647e9d;
-  font-size: 12px;
+.interaction-controls {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 92px;
+  padding: 18px 28px 22px;
+  border-top: 1px solid rgba(115, 161, 218, 0.14);
+  background: rgba(6, 16, 28, 0.7);
 }
 
-.voice-controls {
+.voice-actions {
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding-top: 12px;
+  gap: 12px;
 }
 
 .microphone-button {
@@ -476,16 +483,27 @@ h2 {
   }
 
   .workspace {
-    grid-template-columns: 1fr;
+    min-height: calc(100dvh - 196px);
   }
 
   .stage {
-    min-height: 440px;
-    border-right: 0;
-    border-bottom: 1px solid rgba(115, 161, 218, 0.16);
+    min-height: 0;
+    padding: 16px 16px 0;
+  }
+
+  .interaction-controls {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .voice-actions {
+    flex-wrap: wrap;
   }
 
   .conversation-panel {
-    min-height: 620px;
+    min-height: calc(100dvh - 36px);
+    margin-top: 18px;
+    padding: 20px;
   }
 }
