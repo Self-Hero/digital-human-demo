@@ -47,7 +47,10 @@ function downsampleToPcm16(input: Float32Array, inputRate: number): Uint8Array {
   return new Uint8Array(buffer);
 }
 
-export function useConversation(avatarSessionId: string | null) {
+export function useConversation(
+  avatarSessionId: string | null,
+  avatarMediaConnected: boolean,
+) {
   const socketRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const assistantItemByTurn = useRef(new Map<string, string>());
@@ -59,6 +62,7 @@ export function useConversation(avatarSessionId: string | null) {
   const playbackSourcesRef = useRef(new Set<AudioBufferSourceNode>());
   const nextPlaybackAtRef = useRef(0);
   const avatarSessionIdRef = useRef(avatarSessionId);
+  const avatarMediaConnectedRef = useRef(avatarMediaConnected);
 
   const [state, setState] = useState<SessionState>("connecting");
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
@@ -159,7 +163,7 @@ export function useConversation(avatarSessionId: string | null) {
             return;
           }
           if (event.type === "audio.delta" && event.audio) {
-            if (!avatarSessionIdRef.current) {
+            if (!avatarMediaConnectedRef.current) {
               playPcm16(event.audio, event.sampleRate ?? 24_000);
             }
             return;
@@ -256,6 +260,10 @@ export function useConversation(avatarSessionId: string | null) {
       );
     }
   }, [avatarSessionId]);
+
+  useEffect(() => {
+    avatarMediaConnectedRef.current = avatarMediaConnected;
+  }, [avatarMediaConnected]);
 
   const startMicrophone = useCallback(async () => {
     const socket = socketRef.current;

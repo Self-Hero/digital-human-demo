@@ -60,7 +60,9 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
       <div className="stage-status">
         <span className={`status-dot state-${state}`} />
         <strong>{stateLabels[state]}</strong>
-        {avatar.sessionId && <span className="avatar-session">数字人已连接</span>}
+        {avatar.connectionState === "connected" && (
+          <span className="avatar-session">数字人媒体已连接</span>
+        )}
         {metrics && (
           <span className="metrics">
             首段音频 {metrics.firstAudioMs ?? "—"} ms · 完整响应 {metrics.totalMs} ms

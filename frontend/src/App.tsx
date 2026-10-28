@@ -5,7 +5,10 @@ import { useConversation } from "./hooks/useConversation";
 
 export default function App() {
   const avatar = useAvatarSession();
-  const conversation = useConversation(avatar.sessionId);
+  const conversation = useConversation(
+    avatar.sessionId,
+    avatar.connectionState === "connected",
+  );
 
   return (
     <main className="app-shell">
