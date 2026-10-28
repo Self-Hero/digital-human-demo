@@ -32,7 +32,20 @@ export function useAvatarSession() {
 
     setConnectionState("connecting");
     setError(null);
-    const peer = new RTCPeerConnection({ sdpSemantics: "unified-plan" });
+    const turnUrl = import.meta.env.VITE_TURN_URL;
+    const peer = new RTCPeerConnection({
+      sdpSemantics: "unified-plan",
+      iceServers: turnUrl
+        ? [
+            {
+              urls: turnUrl,
+              username: import.meta.env.VITE_TURN_USERNAME,
+              credential: import.meta.env.VITE_TURN_PASSWORD,
+            },
+          ]
+        : [],
+      iceTransportPolicy: turnUrl ? "relay" : "all",
+    });
     peerRef.current = peer;
 
     peer.addTransceiver("video", { direction: "recvonly" });
