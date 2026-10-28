@@ -158,7 +158,7 @@ export function useAvatarSession() {
           idleTimerRef.current = window.setTimeout(() => {
             setPlaybackSpeaking(false);
             idleTimerRef.current = null;
-          }, 320);
+          }, 160);
         }
       };
     } catch (cause) {
