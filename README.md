@@ -29,18 +29,21 @@ npm run dev
 
 浏览器访问 `http://localhost:5173`。当前通过文字输入验证模拟流式链路，麦克风、真实音频和数字人视频会在后续阶段接入。
 
-真实端到端语音默认使用豆包双工 Realtime API。后端 `.env` 至少需要：
+真实端到端语音默认使用豆包旧版二进制 Realtime API。后端 `.env` 至少需要：
 
 ```env
 REALTIME_PROVIDER=doubao
-DOUBAO_API_KEY=你的豆包双工实时语音_API_Key
-DOUBAO_REALTIME_MODEL=1.2.6.1
-DOUBAO_REALTIME_VOICE=zh_male_xiaotian_jupiter_bigtts
-DOUBAO_INPUT_FORMAT=pcm
-DOUBAO_OUTPUT_FORMAT=pcm_s16le
+DOUBAO_APP_ID=控制台中的_App_ID
+DOUBAO_ACCESS_KEY=控制台中的_Access_Key
+DOUBAO_RESOURCE_ID=volc.speech.dialog
+DOUBAO_APP_KEY=控制台中的_App_Key
+DOUBAO_REALTIME_VOICE=你的预置或复刻音色_ID
 ```
 
-API Key 只保存在后端。将 `REALTIME_PROVIDER` 改为 `bailian` 可回退到原百炼适配器。
+凭证只保存在后端。旧版接口固定连接
+`wss://openspeech.bytedance.com/api/v3/realtime/dialogue`，浏览器向后端发送
+16 kHz PCM，豆包返回 24 kHz `pcm_s16le`。将 `REALTIME_PROVIDER` 改为
+`bailian` 可回退到原百炼适配器。
 
 ## 1. 目标与范围
 
@@ -50,7 +53,7 @@ API Key 只保存在后端。将 `REALTIME_PROVIDER` 改为 `bailian` 可回退�
 - 口型模型：MuseTalk
 - GPU：单张 NVIDIA RTX 4090 24GB
 - 数字人数量：1 个固定真人数字人
-- 实时语音：豆包双工 Realtime `1.2.6.1`，端到端语音输入和语音输出
+- 实时语音：豆包旧版 Realtime，端到端语音输入和语音输出
 - 输出：WebRTC，720p、25 FPS
 - 性能目标：用户说完后 3 秒内数字人开始发声并出现同步口型
 
@@ -273,7 +276,7 @@ RealtimeAudio.interrupt(turn_id)
 
 ### 线上服务
 
-- 豆包双工 Realtime `1.2.6.1` 通过 WebSocket 持续接收麦克风音频并返回回复音频流。
+- 豆包旧版 Realtime 通过二进制 WebSocket 持续接收麦克风音频并返回回复音频流。
 - 实测接口是否返回用户和助手字幕、回复音频格式、采样率及可选音色。
 - 记录连接耗时、首段回复音频、整轮耗时、错误率和限流指标。
 - API Key 只保存在后端密钥管理或环境变量中，绝不能下发浏览器。

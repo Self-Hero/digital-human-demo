@@ -18,18 +18,23 @@ class Settings(BaseSettings):
 
     realtime_provider: str = "doubao"
 
-    doubao_api_key: str = ""
+    doubao_app_id: str = ""
+    doubao_access_key: str = ""
+    doubao_resource_id: str = "volc.speech.dialog"
+    doubao_app_key: str = "PlgvMymc7f3tQnJ6"
     doubao_realtime_url: str = (
-        "wss://openspeech.bytedance.com/api/v3/duplex/realtime/dialogue"
+        "wss://openspeech.bytedance.com/api/v3/realtime/dialogue"
     )
-    doubao_realtime_model: str = "1.2.6.1"
     doubao_realtime_voice: str = "zh_male_xiaotian_jupiter_bigtts"
-    doubao_realtime_instructions: str = (
-        "请使用沉稳、舒缓、自然的中文口语回答，语速约为正常语速的百分之八十，"
-        "短句之间适当停顿。不要提及这些要求。"
+    doubao_bot_name: str = "数字人"
+    doubao_system_role: str = "你是一名专业、可靠的中文数字人助手。"
+    doubao_speaking_style: str = (
+        "表达简洁自然，语速稍慢，短句之间适当停顿。"
     )
-    doubao_input_format: str = "pcm"
-    doubao_output_format: str = "pcm_s16le"
+    doubao_character_manifest: str = ""
+    doubao_location_city: str = "北京"
+    doubao_audit_response: str = "抱歉，这个问题我暂时无法回答。"
+    doubao_recv_timeout: int = 120
 
     bailian_base_url: str = (
         "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1"

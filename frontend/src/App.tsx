@@ -18,7 +18,7 @@ export default function App() {
           <p className="eyebrow">REALTIME DIGITAL HUMAN</p>
           <h1>实时数字人交互 Demo</h1>
         </div>
-        <div className="architecture-pill">Bailian Realtime · MuseTalk</div>
+        <div className="architecture-pill">Doubao Realtime · MuseTalk</div>
       </header>
 
       <div className="workspace">
