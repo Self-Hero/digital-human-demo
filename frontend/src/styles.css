@@ -94,8 +94,12 @@ h2 {
 }
 
 .stage {
+  --avatar-aspect-ratio: 0.5625;
+
   display: flex;
+  align-items: center;
   flex-direction: column;
+  justify-content: center;
   min-height: 0;
   padding: 24px 24px 0;
   background:
@@ -123,13 +127,22 @@ h2 {
 .avatar-video-shell {
   position: relative;
   display: grid;
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   place-items: center;
+  aspect-ratio: var(--avatar-aspect-ratio);
   overflow: hidden;
   border: 1px solid rgba(109, 170, 244, 0.18);
   border-radius: 18px;
   background: #050b12;
+}
+
+.stage[data-orientation="portrait"] .avatar-video-shell {
+  width: min(100%, 390px, 38dvh);
+}
+
+.stage[data-orientation="landscape"] .avatar-video-shell {
+  width: min(100%, 1100px, 108dvh);
 }
 
 .avatar-live-video,
@@ -253,7 +266,10 @@ h2 {
 .stage-status {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 10px;
+  width: min(100%, 760px);
   min-height: 48px;
   padding-top: 18px;
   color: #bed0e7;
@@ -489,6 +505,14 @@ h2 {
   .stage {
     min-height: 0;
     padding: 16px 16px 0;
+  }
+
+  .stage[data-orientation="portrait"] .avatar-video-shell {
+    width: min(100%, 360px, 38dvh);
+  }
+
+  .stage[data-orientation="landscape"] .avatar-video-shell {
+    width: min(100%, 900px, 92dvh);
   }
 
   .interaction-controls {

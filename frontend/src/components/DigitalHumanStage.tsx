@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import type { AvatarConnectionState } from "../hooks/useAvatarSession";
 import type { SessionState, TurnMetrics } from "../types/conversation";
@@ -30,7 +30,12 @@ interface Props {
 export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [mediaAspectRatio, setMediaAspectRatio] = useState(9 / 16);
   const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE;
+
+  const updateAspectRatio = (width: number, height: number) => {
+    if (width > 0 && height > 0) setMediaAspectRatio(width / height);
+  };
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = avatar.videoStream;
@@ -40,10 +45,32 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
     if (audioRef.current) audioRef.current.srcObject = avatar.audioStream;
   }, [avatar.audioStream]);
 
+  const stageStyle = {
+    "--avatar-aspect-ratio": mediaAspectRatio,
+  } as CSSProperties;
+  const orientation = mediaAspectRatio < 1 ? "portrait" : "landscape";
+
   return (
-    <section className="stage" aria-label="数字人预览区">
+    <section
+      className="stage"
+      aria-label="数字人预览区"
+      data-orientation={orientation}
+      style={stageStyle}
+    >
       <div className={`avatar-video-shell state-${state}`}>
-        <video className="avatar-live-video" ref={videoRef} autoPlay playsInline muted />
+        <video
+          className="avatar-live-video"
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          onLoadedMetadata={(event) => {
+            updateAspectRatio(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
+          }}
+          onResize={(event) => {
+            updateAspectRatio(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
+          }}
+        />
         {idleImage && (
           <img
             className={`avatar-idle-image${avatar.playbackSpeaking ? " is-hidden" : ""}`}
@@ -51,6 +78,12 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
             alt=""
             aria-hidden="true"
             draggable={false}
+            onLoad={(event) => {
+              updateAspectRatio(
+                event.currentTarget.naturalWidth,
+                event.currentTarget.naturalHeight,
+              );
+            }}
             onError={(event) => {
               event.currentTarget.hidden = true;
             }}
