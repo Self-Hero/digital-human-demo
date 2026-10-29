@@ -70,6 +70,18 @@ python backend/scripts/tune_musetalk_masks.py \
 
 ## 启动
 
+首次部署或 LiveTalking 代码更新后，先将 WebRTC 实际编码分辨率设为竖屏
+`720x1280`：
+
+```bash
+cd /root/autodl-tmp/digital-human-demo
+python backend/scripts/configure_livetalking_video.py
+```
+
+脚本会在 `/root/LiveTalking/server/webrtc.py.before-720p` 保留一份原文件备份，
+并且可以重复执行。它只在视频帧进入 aiortc 编码器前缩放，不会重做
+avatar 或改变 MuseTalk 推理。
+
 ```bash
 cd /root/LiveTalking
 test -e data/avatars/feng_yucai_consistent_1080 || \
