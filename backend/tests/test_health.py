@@ -11,6 +11,7 @@ def test_health_reports_mock_providers() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
+    assert payload["providers"]["realtime"] == "doubao"
     assert payload["providers"]["avatar"] == "mock"
 
 
@@ -22,6 +23,17 @@ def test_bailian_realtime_defaults() -> None:
     )
     assert settings.bailian_realtime_model == "qwen-audio-3.0-realtime-plus"
     assert settings.bailian_realtime_voice == "longanqian"
+
+
+def test_doubao_realtime_defaults() -> None:
+    settings = Settings(_env_file=None)
+    assert settings.realtime_provider == "doubao"
+    assert settings.doubao_realtime_url == (
+        "wss://openspeech.bytedance.com/api/v3/duplex/realtime/dialogue"
+    )
+    assert settings.doubao_realtime_model == "1.2.6.1"
+    assert settings.doubao_input_format == "pcm"
+    assert settings.doubao_output_format == "pcm_s16le"
 
 
 def test_session_lifecycle() -> None:

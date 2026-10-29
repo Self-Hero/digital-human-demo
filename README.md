@@ -29,6 +29,19 @@ npm run dev
 
 浏览器访问 `http://localhost:5173`。当前通过文字输入验证模拟流式链路，麦克风、真实音频和数字人视频会在后续阶段接入。
 
+真实端到端语音默认使用豆包双工 Realtime API。后端 `.env` 至少需要：
+
+```env
+REALTIME_PROVIDER=doubao
+DOUBAO_API_KEY=你的豆包双工实时语音_API_Key
+DOUBAO_REALTIME_MODEL=1.2.6.1
+DOUBAO_REALTIME_VOICE=zh_male_xiaotian_jupiter_bigtts
+DOUBAO_INPUT_FORMAT=pcm
+DOUBAO_OUTPUT_FORMAT=pcm_s16le
+```
+
+API Key 只保存在后端。将 `REALTIME_PROVIDER` 改为 `bailian` 可回退到原百炼适配器。
+
 ## 1. 目标与范围
 
 本阶段采用以下固定方案：
@@ -37,7 +50,7 @@ npm run dev
 - 口型模型：MuseTalk
 - GPU：单张 NVIDIA RTX 4090 24GB
 - 数字人数量：1 个固定真人数字人
-- 实时语音：百炼 `qwen-audio-3.0-realtime-plus`，端到端语音输入和语音输出
+- 实时语音：豆包双工 Realtime `1.2.6.1`，端到端语音输入和语音输出
 - 输出：WebRTC，720p、25 FPS
 - 性能目标：用户说完后 3 秒内数字人开始发声并出现同步口型
 
@@ -55,7 +68,7 @@ Demo 阶段不部署本地语音或语言模型，不使用 Kubernetes，也不�
              ▼
 API 网关 / 对话编排服务（FastAPI）
 ├─ 会话、turnId、取消与打断控制
-├─ 百炼 Realtime WebSocket 适配器
+├─ 豆包双工 Realtime WebSocket 适配器（可回退百炼）
 ├─ 麦克风音频上行和回复音频下行
 ├─ 字幕事件、取消和用户插话
 └─ 音频队列、指标与日志
@@ -82,21 +95,21 @@ LiveTalking + MuseTalk Worker
 | 环节 | P95 预算 |
 |---|---:|
 | VAD 判断用户说完 | 300～600 ms |
-| 百炼实时模型返回首段音频 | 400～1,200 ms |
+| 豆包实时模型返回首段音频 | 400～1,200 ms |
 | MuseTalk 首批画面与播放缓冲 | 200～450 ms |
 | WebRTC 网络与解码 | 100～250 ms |
 | 目标总计 | 1.0～2.5 s |
 
 必须满足以下工程条件：
 
-1. 浏览器和百炼之间保持双向实时音频流，不能等待完整录音或完整回复。
-2. 百炼返回的音频分片立即进入播放队列和 MuseTalk，不能等待完整回答。
+1. 浏览器和豆包之间保持双向实时音频流，不能等待完整录音或完整回复。
+2. 豆包返回的音频分片立即进入播放队列和 MuseTalk，不能等待完整回答。
 3. 回复音频统一转换为 MuseTalk 所需的单声道 PCM 格式；最终采样率按接口实测确定。
 5. MuseTalk 模型和数字人素材必须在服务启动时加载，并常驻 GPU，不能每轮会话重新加载。
 6. 数字人素材在部署前完成人脸检测、裁剪、蒙版、特征和帧缓存预处理。
 7. 初始音视频缓冲控制在约 100～180 ms；以音频为主时钟，视频来不及时丢弃过期帧，不暂停音频等待画面。
 8. GPU 编码使用 NVENC，避免 CPU 软件编码成为瓶颈。
-9. GPU服务器应选择与百炼中国大陆端点网络 RTT 较低的地域。
+9. GPU服务器应选择与豆包中国大陆端点网络 RTT 较低的地域。
 10. 前端开启浏览器 AEC，否则数字人的扬声器声音可能再次进入 ASR。
 
 补充指标：
@@ -197,7 +210,7 @@ idle → listening → thinking → speaking
 Demo 阶段同一台服务器部署，但保持逻辑进程分离：
 
 1. `web`：前端静态资源和反向代理。
-2. `api-orchestrator`：FastAPI，会话、鉴权、百炼Realtime适配、取消和日志。
+2. `api-orchestrator`：FastAPI，会话、鉴权、豆包Realtime适配、取消和日志。
 3. `livetalking`：WebRTC 会话、音视频队列和 Avatar 接口。
 4. `musetalk-worker`：模型常驻显存，单数字人串行消费音频任务。
 5. `coturn`：需要公网穿透时启用。
@@ -216,7 +229,7 @@ POST /internal/avatar/stop
 GET  /internal/avatar/health
 ```
 
-百炼端到端实时模型通过适配器隔离：
+豆包端到端实时模型通过适配器隔离：
 
 ```text
 RealtimeAudio.connect(session)
@@ -230,7 +243,7 @@ RealtimeAudio.interrupt(turn_id)
 ### 队列与背压
 
 - 每次回答创建新的 `turnId`。
-- 百炼回复音频和视频帧都绑定同一个 `turnId`。
+- 豆包回复音频和视频帧都绑定同一个 `turnId`。
 - 回复音频队列只允许保留少量未来音频，建议不超过 1～2 秒，避免打断迟钝。
 - GPU Worker 只处理当前有效轮次；检测到取消后立即丢弃旧任务。
 - 音频播放进度是主时钟，视频帧按时间戳匹配。
@@ -260,7 +273,7 @@ RealtimeAudio.interrupt(turn_id)
 
 ### 线上服务
 
-- `qwen-audio-3.0-realtime-plus` 必须通过 WebSocket 持续接收麦克风音频并返回回复音频流。
+- 豆包双工 Realtime `1.2.6.1` 通过 WebSocket 持续接收麦克风音频并返回回复音频流。
 - 实测接口是否返回用户和助手字幕、回复音频格式、采样率及可选音色。
 - 记录连接耗时、首段回复音频、整轮耗时、错误率和限流指标。
 - API Key 只保存在后端密钥管理或环境变量中，绝不能下发浏览器。
@@ -306,9 +319,9 @@ RealtimeAudio.interrupt(turn_id)
 - 浏览器稳定播放 720p/25 FPS 音视频。
 - 验证公网 HTTPS、WebRTC 和必要的 TURN 回落。
 
-### 第 3 步：百炼端到端实时语音
+### 第 3 步：豆包端到端实时语音
 
-- 接入 `qwen-audio-3.0-realtime-plus` 双向WebSocket。
+- 接入豆包双工 Realtime `1.2.6.1` WebSocket。
 - 先验证麦克风语音输入和回复音频输出，再把回复音频送入MuseTalk。
 - 重点测首包、字幕事件、音画同步、分片边界和打断。
 
