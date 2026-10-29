@@ -82,6 +82,18 @@ python backend/scripts/configure_livetalking_video.py
 并且可以重复执行。它只在视频帧进入 aiortc 编码器前缩放，不会重做
 avatar 或改变 MuseTalk 推理。
 
+如果原始待机帧和 MuseTalk 说话帧的脸部细节差异明显，可以安装静音推理开关：
+
+```bash
+cd /root/autodl-tmp/digital-human-demo
+python backend/scripts/configure_livetalking_silence_inference.py
+```
+
+启动 LiveTalking 前设置 `LIVETALKING_INFER_SILENCE=1`。静音帧会使用零音频特征经过
+同一套 MuseTalk 推理和 mask 融合，但音频仍然保持静音，说话状态也不变。
+不设置该变量时保持 LiveTalking 原始逻辑。脚本备份原文件到
+`/root/LiveTalking/avatars/base_avatar.py.before-silence-inference`。
+
 ```bash
 cd /root/LiveTalking
 test -e data/avatars/feng_yucai_consistent_1080 || \
