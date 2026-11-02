@@ -380,7 +380,8 @@ mapfile -t conda_dlib_packages < <(
 )
 if ((${#conda_dlib_packages[@]})); then
   log "Removing incompatible Conda dlib packages"
-  "${CONDA_BIN}" remove -y -n "${LIVETALKING_ENV}" \
+  "${CONDA_BIN}" remove -y -n "${LIVETALKING_ENV}" --override-channels \
+    -c "${CONDA_CHANNEL}" \
     "${conda_dlib_packages[@]}"
 fi
 
