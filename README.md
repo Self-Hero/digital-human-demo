@@ -21,6 +21,14 @@ cd /data/digital-human-demo
 bash deploy/bootstrap_server.sh --public-ip 36.103.177.214
 ```
 
+安装完成后，单独处理人物素材并启动 LiveTalking：
+
+```bash
+bash deploy/start_avatar.sh \
+  --avatar-source /data/source/dameng_slient2.mp4 \
+  --avatar-id ma_renda_dynamic
+```
+
 后端本地启动：
 
 ```powershell

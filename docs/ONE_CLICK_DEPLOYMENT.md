@@ -45,35 +45,34 @@ Hugging Face 镜像和 npmmirror；PyTorch CUDA wheel 仍从 PyTorch 官方源�
 只安装实时推理所需权重。MuseTalk 1.0、DWPose、SyncNet 属于旧版本、训练或评估路径，
 LiveTalking 的 MuseTalk 1.5 实时链路不会读取它们，因此不下载。
 
-## 连人物素材一起部署
+## 处理人物素材并启动
 
-如果待机视频已经上传到服务器，可以一次完成预处理和服务启动：
+安装脚本不会处理人物素材，也不会启动 LiveTalking 人物实例。安装完成并上传待机视频后，
+运行独立启动脚本完成预处理、前端人物 ID 配置和服务启动：
 
 ```bash
 cd /data/digital-human-demo
-bash deploy/bootstrap_server.sh \
-  --public-ip 36.103.177.214 \
-  --avatar-source /data/source/ma_renda_idle_25fps.mp4 \
+bash deploy/start_avatar.sh \
+  --avatar-source /data/source/dameng_slient2.mp4 \
   --avatar-id ma_renda_dynamic
 ```
 
 默认使用 MuseTalk v1.5、`bbox_shift=-2`、`extra_margin=0` 和 `jaw` 融合方式。预处理结果
 位于 `/data/LiveTalking/data/avatars/<avatar-id>`。
 
-若环境和模型已经装好，只补人物素材：
+人物已经预处理过时，无需再传素材，直接启动或重启：
 
 ```bash
-bash deploy/bootstrap_server.sh \
-  --skip-apt \
-  --skip-models \
-  --avatar-source /data/source/ma_renda_idle_25fps.mp4 \
-  --avatar-id ma_renda_dynamic
+bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 ```
+
+切换人物时，脚本会停止其他占用 `8010` 端口的 LiveTalking 人物实例，然后启动指定实例。
+它不会重新安装依赖或下载模型。
 
 ## 验证与日志
 
 ```bash
-bash deploy/bootstrap_server.sh --verify-only --avatar-id ma_renda_dynamic
+bash deploy/bootstrap_server.sh --verify-only
 
 sudo systemctl status digital-human-backend
 sudo systemctl status livetalking@ma_renda_dynamic
@@ -89,5 +88,6 @@ sudo journalctl -u livetalking@ma_renda_dynamic -f
 
 脚本设计为可重复运行：已存在的 Conda 环境和完整模型会复用，Hugging Face 下载支持
 续传，已有 `backend/.env` 和 `frontend/.env.production` 不会被覆盖。每次运行仍会检查
-关键模型哈希，并在配置变化后重启对应服务。若 LiveTalking 有未提交的代码修改，脚本
+关键模型哈希，并在配置变化后重启后端和 Nginx。人物预处理和 LiveTalking 实例启动只由
+`deploy/start_avatar.sh` 负责。若 LiveTalking 有未提交的代码修改，脚本
 不会强制切换提交，避免覆盖人工修改。

@@ -23,8 +23,7 @@ MINICONDA_INSTALLER_URL="${MINICONDA_INSTALLER_URL:-https://mirrors.tuna.tsinghu
 
 LIVETALKING_ENV="livetalking"
 APP_ENV="digitalhuman"
-AVATAR_ID="ma_renda_dynamic"
-AVATAR_SOURCE=""
+DEFAULT_AVATAR_ID="ma_renda_dynamic"
 SKIP_APT=0
 SKIP_MODELS=0
 SKIP_SERVICES=0
@@ -40,8 +39,6 @@ and an Nginx public entrypoint on Ubuntu 22.04.
 
 Options:
   --public-ip IP             Public IPv4 used in CORS (default: 36.103.177.214)
-  --avatar-source PATH       Optional source video/image to preprocess
-  --avatar-id ID             Avatar id (default: ma_renda_dynamic)
   --enable-silence-inference Apply the optional zero-audio MuseTalk patch
   --skip-apt                 Do not install Ubuntu packages
   --skip-models              Do not download model weights
@@ -131,8 +128,6 @@ require_option_value() {
 while (($#)); do
   case "$1" in
     --public-ip) require_option_value "$1" "${2:-}"; PUBLIC_IP="$2"; shift 2 ;;
-    --avatar-source) require_option_value "$1" "${2:-}"; AVATAR_SOURCE="$2"; shift 2 ;;
-    --avatar-id) require_option_value "$1" "${2:-}"; AVATAR_ID="$2"; shift 2 ;;
     --enable-silence-inference) ENABLE_SILENCE_INFERENCE=1; shift ;;
     --skip-apt) SKIP_APT=1; shift ;;
     --skip-models) SKIP_MODELS=1; shift ;;
@@ -265,13 +260,6 @@ verify_deployment() {
     echo "Backend health check: OK"
   else
     warn "digital-human-backend.service is not running."
-  fi
-
-  if systemctl is-active --quiet "livetalking@${AVATAR_ID}.service"; then
-    curl --fail --silent --show-error http://127.0.0.1:8010/ >/dev/null || \
-      warn "LiveTalking is active but its HTTP root did not return success."
-  else
-    warn "LiveTalking avatar service is not running (expected until an avatar is prepared)."
   fi
 
   echo "Deployment verification completed."
@@ -456,7 +444,7 @@ set_env_value "${PROJECT_DIR}/backend/.env" \
 if [[ ! -f "${PROJECT_DIR}/frontend/.env.production" ]]; then
   cp "${PROJECT_DIR}/frontend/.env.example" "${PROJECT_DIR}/frontend/.env.production"
 fi
-set_env_value "${PROJECT_DIR}/frontend/.env.production" VITE_AVATAR_ID "${AVATAR_ID}"
+set_env_value "${PROJECT_DIR}/frontend/.env.production" VITE_AVATAR_ID "${DEFAULT_AVATAR_ID}"
 set_env_value "${PROJECT_DIR}/frontend/.env.production" VITE_STUN_URL "${STUN_URL}"
 (
   cd "${PROJECT_DIR}/frontend"
@@ -476,20 +464,6 @@ if ((ENABLE_SILENCE_INFERENCE)); then
   "${BACKEND_PY}" \
     "${PROJECT_DIR}/backend/scripts/configure_livetalking_silence_inference.py" \
     --livetalking-dir "${LIVETALKING_DIR}"
-fi
-
-if [[ -n "${AVATAR_SOURCE}" ]]; then
-  [[ -e "${AVATAR_SOURCE}" ]] || die "Avatar source does not exist: ${AVATAR_SOURCE}"
-  log "Preparing avatar ${AVATAR_ID}"
-  (
-    cd "${LIVETALKING_DIR}"
-    conda_run "${LIVETALKING_ENV}" python -m avatars.musetalk.genavatar \
-      --file "${AVATAR_SOURCE}" \
-      --avatar_id "${AVATAR_ID}" \
-      --save_path "${LIVETALKING_DIR}/data/avatars" \
-      --version v15 --gpu_id 0 --bbox_shift -2 --extra_margin 0 \
-      --parsing_mode jaw
-  )
 fi
 
 if ((SKIP_SERVICES == 0)); then
@@ -584,12 +558,6 @@ EOF
   "${SUDO[@]}" systemctl restart digital-human-backend.service
   "${SUDO[@]}" systemctl reload-or-restart nginx
 
-  if [[ -s "${LIVETALKING_DIR}/data/avatars/${AVATAR_ID}/latents.pt" ]]; then
-    "${SUDO[@]}" systemctl enable "livetalking@${AVATAR_ID}.service"
-    "${SUDO[@]}" systemctl restart "livetalking@${AVATAR_ID}.service"
-  else
-    warn "No prepared avatar '${AVATAR_ID}'; LiveTalking service was installed but not started."
-  fi
 fi
 
 verify_deployment
@@ -601,9 +569,9 @@ Public page: http://${PUBLIC_IP}/
 Backend env: ${PROJECT_DIR}/backend/.env
 LiveTalking: ${LIVETALKING_DIR}
 
-If no avatar was supplied, rerun with:
-  bash deploy/bootstrap_server.sh --skip-apt --skip-models \\
-    --avatar-source /data/source/avatar.mp4 --avatar-id ${AVATAR_ID}
+Prepare and start an avatar separately with:
+  bash deploy/start_avatar.sh \\
+    --avatar-source /data/source/avatar.mp4 --avatar-id ${DEFAULT_AVATAR_ID}
 
 For microphone access, bind a domain and enable trusted HTTPS.
 EOF
