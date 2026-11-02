@@ -310,7 +310,7 @@ scipy==1.18.1
     #   -r _upstream_livetalking/requirements.txt
     #   librosa
     #   scikit-learn
-setuptools==84.2.1
+setuptools==80.9.0
     # via torch
 shellingham==1.5.4
     # via typer

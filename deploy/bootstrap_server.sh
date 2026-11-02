@@ -248,7 +248,7 @@ verify_deployment() {
   (
     cd "${LIVETALKING_DIR}"
     conda_run "${LIVETALKING_ENV}" python -c \
-      "import torch, cv2, aiortc, diffusers, transformers; import avatars.musetalk_avatar; import avatars.musetalk.genavatar; assert torch.__version__.startswith('2.9.1+cu128'), torch.__version__; assert torch.cuda.is_available(); print('LiveTalking imports OK; torch', torch.__version__, 'cuda', torch.version.cuda, 'gpu', torch.cuda.get_device_name(0))"
+      "import torch, cv2, aiortc, diffusers, transformers; import face_recognition_models, face_recognition; import avatars.musetalk_avatar; import avatars.musetalk.genavatar; assert torch.__version__.startswith('2.9.1+cu128'), torch.__version__; assert torch.cuda.is_available(); print('LiveTalking imports OK; torch', torch.__version__, 'cuda', torch.version.cuda, 'gpu', torch.cuda.get_device_name(0))"
   )
   "${BACKEND_PY}" -c "import fastapi, httpx, websockets; print('backend imports OK')"
   conda_run "${APP_ENV}" node --version
@@ -394,11 +394,12 @@ if ! conda_run "${LIVETALKING_ENV}" python -c \
 fi
 
 if ! conda_run "${LIVETALKING_ENV}" python -c \
-  "import dlib, face_recognition" >/dev/null 2>&1; then
+  "import dlib, face_recognition_models, face_recognition" >/dev/null 2>&1; then
   log "Installing MuseTalk face landmark dependencies"
   conda_run "${LIVETALKING_ENV}" python -m pip install --force-reinstall --no-deps \
-    dlib-bin==20.0.1.post1 face-recognition-models==0.3.0 \
-    face-recognition==1.3.0 -i "${PIP_INDEX_URL}" \
+    setuptools==80.9.0 dlib-bin==20.0.1.post1 \
+    face-recognition-models==0.3.0 face-recognition==1.3.0 \
+    -i "${PIP_INDEX_URL}" \
     --timeout 180 --retries 10
 fi
 

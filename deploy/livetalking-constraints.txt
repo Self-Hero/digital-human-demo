@@ -2,3 +2,5 @@
 # upstream revision. bootstrap_server.sh installs torchvision and torchaudio
 # from the same PyTorch CUDA 12.8 index before applying the dependency lock.
 torch==2.9.1
+# face-recognition-models 0.3.0 imports pkg_resources at runtime.
+setuptools==80.9.0
