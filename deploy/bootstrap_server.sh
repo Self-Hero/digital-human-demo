@@ -372,16 +372,33 @@ conda_run "${LIVETALKING_ENV}" python -m pip install \
   --timeout 180 --retries 10
 
 # LiveTalking's MuseTalk avatar preprocessor imports face_recognition, but the
-# pinned upstream requirements omit it. Install dlib from conda-forge to avoid
-# an expensive and fragile local C++ build on Python 3.12.
+# pinned upstream requirements omit it. Use a prebuilt pip wheel so Conda does
+# not replace the environment's NumPy or pull in a second CUDA runtime.
+mapfile -t conda_dlib_packages < <(
+  "${CONDA_BIN}" list -n "${LIVETALKING_ENV}" | \
+    awk '$1 == "dlib" || $1 == "libdlib" { print $1 }'
+)
+if ((${#conda_dlib_packages[@]})); then
+  log "Removing incompatible Conda dlib packages"
+  "${CONDA_BIN}" remove -y -n "${LIVETALKING_ENV}" \
+    "${conda_dlib_packages[@]}"
+fi
+
+if ! conda_run "${LIVETALKING_ENV}" python -c \
+  "import numpy, cv2; assert numpy.__version__ == '2.5.4'" >/dev/null 2>&1; then
+  log "Repairing NumPy and OpenCV after the dlib dependency check"
+  conda_run "${LIVETALKING_ENV}" python -m pip install --force-reinstall \
+    --no-cache-dir numpy==2.5.4 opencv-python-headless==5.0.0.93 \
+    -i "${PIP_INDEX_URL}" --timeout 180 --retries 10
+fi
+
 if ! conda_run "${LIVETALKING_ENV}" python -c \
   "import dlib, face_recognition" >/dev/null 2>&1; then
   log "Installing MuseTalk face landmark dependencies"
-  CONDA_OVERRIDE_CUDA="" "${CONDA_BIN}" install -y -n "${LIVETALKING_ENV}" \
-    --override-channels -c "${CONDA_CHANNEL}" dlib
-  conda_run "${LIVETALKING_ENV}" python -m pip install --no-deps \
-    face-recognition-models==0.3.0 face-recognition==1.3.0 \
-    -i "${PIP_INDEX_URL}" --timeout 180 --retries 10
+  conda_run "${LIVETALKING_ENV}" python -m pip install --force-reinstall --no-deps \
+    dlib-bin==20.0.1.post1 face-recognition-models==0.3.0 \
+    face-recognition==1.3.0 -i "${PIP_INDEX_URL}" \
+    --timeout 180 --retries 10
 fi
 
 if ((SKIP_MODELS == 0)); then
