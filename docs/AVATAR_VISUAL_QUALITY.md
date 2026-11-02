@@ -17,19 +17,19 @@ MuseTalk v1.5 只生成低分辨率的人脸区域，再放大并通过 mask 融
 
 这样两种状态共享完全相同的分辨率、压缩来源、身体姿态和帧索引，区别仅限于口型区域。
 
-## AutoDL 重建
+## 公网 GPU 服务器重建
 
 在 LiveTalking 终端中整段执行：
 
 ```bash
-cd /root/LiveTalking
+cd /data/LiveTalking
 conda activate livetalking
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 
 python -m avatars.musetalk.genavatar \
-  --file /root/autodl-tmp/livetalking-data/source/feng_yucai_idle_20s_1080x1920_25fps.mp4 \
+  --file /data/livetalking-data/source/feng_yucai_idle_20s_1080x1920_25fps.mp4 \
   --avatar_id feng_yucai_consistent_1080 \
-  --save_path /root/autodl-tmp/livetalking-data/avatars \
+  --save_path /data/livetalking-data/avatars \
   --version v15 \
   --gpu_id 0 \
   --bbox_shift -2 \
@@ -45,9 +45,9 @@ python -m avatars.musetalk.genavatar \
 拉取本项目最新代码后执行：
 
 ```bash
-cd /root/autodl-tmp/digital-human-demo
+cd /data/digital-human-demo
 python backend/scripts/tune_musetalk_masks.py \
-  /root/autodl-tmp/livetalking-data/avatars/feng_yucai_consistent_1080 \
+  /data/livetalking-data/avatars/feng_yucai_consistent_1080 \
   --erode-px 3 \
   --opacity 0.92
 ```
@@ -64,7 +64,7 @@ python backend/scripts/tune_musetalk_masks.py \
 
 ```bash
 python backend/scripts/tune_musetalk_masks.py \
-  /root/autodl-tmp/livetalking-data/avatars/feng_yucai_consistent_1080 \
+  /data/livetalking-data/avatars/feng_yucai_consistent_1080 \
   --restore
 ```
 
@@ -74,35 +74,32 @@ python backend/scripts/tune_musetalk_masks.py \
 `720x1280`：
 
 ```bash
-cd /root/autodl-tmp/digital-human-demo
+cd /data/digital-human-demo
 python backend/scripts/configure_livetalking_video.py
 ```
 
-脚本会在 `/root/LiveTalking/server/webrtc.py.before-720p` 保留一份原文件备份，
+脚本会在 `/data/LiveTalking/server/webrtc.py.before-720p` 保留一份原文件备份，
 并且可以重复执行。它只在视频帧进入 aiortc 编码器前缩放，不会重做
 avatar 或改变 MuseTalk 推理。
 
 如果原始待机帧和 MuseTalk 说话帧的脸部细节差异明显，可以安装静音推理开关：
 
 ```bash
-cd /root/autodl-tmp/digital-human-demo
+cd /data/digital-human-demo
 python backend/scripts/configure_livetalking_silence_inference.py
 ```
 
 启动 LiveTalking 前设置 `LIVETALKING_INFER_SILENCE=1`。静音帧会使用零音频特征经过
 同一套 MuseTalk 推理和 mask 融合，但音频仍然保持静音，说话状态也不变。
 不设置该变量时保持 LiveTalking 原始逻辑。脚本备份原文件到
-`/root/LiveTalking/avatars/base_avatar.py.before-silence-inference`。
+`/data/LiveTalking/avatars/base_avatar.py.before-silence-inference`。
 
 ```bash
-cd /root/LiveTalking
+cd /data/LiveTalking
 test -e data/avatars/feng_yucai_consistent_1080 || \
-  ln -s /root/autodl-tmp/livetalking-data/avatars/feng_yucai_consistent_1080 \
+  ln -s /data/livetalking-data/avatars/feng_yucai_consistent_1080 \
   data/avatars/feng_yucai_consistent_1080
 
-set -a
-source /root/autodl-tmp/turn.env
-set +a
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 
 python app.py \
@@ -112,7 +109,7 @@ python app.py \
   --batch_size 4 \
   --fps 25 \
   --listenport 8010 \
-  --stun "turn:36.103.236.204:3478?transport=udp"
+  --stun "stun:stun.freeswitch.org:3478"
 ```
 
 这里有意省略 `--customvideo_config`。LiveTalking 在静音时会直接输出 avatar 自己的

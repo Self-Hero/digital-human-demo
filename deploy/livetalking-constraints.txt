@@ -1,0 +1,4 @@
+# Keep the LiveTalking environment on the CUDA stack tested by the pinned
+# upstream revision. bootstrap_server.sh installs torchvision and torchaudio
+# from the same PyTorch CUDA 12.8 index before applying the dependency lock.
+torch==2.9.1

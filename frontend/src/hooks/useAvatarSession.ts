@@ -64,18 +64,20 @@ export function useAvatarSession() {
 
     setConnectionState("connecting");
     setError(null);
+    const stunUrl = import.meta.env.VITE_STUN_URL;
     const turnUrl = import.meta.env.VITE_TURN_URL;
+    const iceServers: RTCIceServer[] = [];
+    if (stunUrl) iceServers.push({ urls: stunUrl });
+    if (turnUrl) {
+      iceServers.push({
+        urls: turnUrl,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_PASSWORD,
+      });
+    }
     const peer = new RTCPeerConnection({
       sdpSemantics: "unified-plan",
-      iceServers: turnUrl
-        ? [
-            {
-              urls: turnUrl,
-              username: import.meta.env.VITE_TURN_USERNAME,
-              credential: import.meta.env.VITE_TURN_PASSWORD,
-            },
-          ]
-        : [],
+      iceServers,
       iceTransportPolicy: turnUrl ? "relay" : "all",
     });
     peerRef.current = peer;

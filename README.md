@@ -9,13 +9,24 @@
 - `backend/app/providers/`：端到端实时语音与 Avatar 的可替换接口；原 ASR、LLM、TTS 接口作为备用。
 - 当前使用 Mock 对话链路和 Mock Avatar，不需要 API Key 或 GPU。
 - `docs/IMPLEMENTATION_PLAN.md`：按阶段接入真实云 API 和 MuseTalk 的实施计划。
+- `docs/PUBLIC_SERVER_DEPLOYMENT.md`：新公网 GPU 服务器的地址、端口和 TURN/HTTPS 部署边界。
+- `docs/ONE_CLICK_DEPLOYMENT.md`：Ubuntu GPU 服务器一键安装、验证和人物素材接入；
+  MuseTalk/LiveTalking 使用独立环境，不修改 SoulX-FlashHead 环境。
+
+公开仓库可直接部署：
+
+```bash
+git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-human-demo
+cd /data/digital-human-demo
+bash deploy/bootstrap_server.sh --public-ip 36.103.177.214
+```
 
 后端本地启动：
 
 ```powershell
 cd backend
 uv sync
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
 ```
 
 前端本地启动：
