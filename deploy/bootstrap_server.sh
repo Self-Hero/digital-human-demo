@@ -14,6 +14,7 @@ GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 PUBLIC_IP="${PUBLIC_IP:-36.103.177.214}"
 STUN_URL="${STUN_URL:-stun:stun.freeswitch.org:3478}"
 HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+TORCH_HOME="${TORCH_HOME:-${DATA_ROOT}/cache/torch}"
 PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 PYTORCH_INDEX_URL="${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
@@ -50,9 +51,9 @@ Options:
 
 Environment overrides:
   DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, LIVETALKING_REPO_URL,
-  LIVETALKING_REF, GITHUB_PROXY_PREFIX, HF_ENDPOINT, PIP_INDEX_URL,
-  PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL, MINICONDA_INSTALLER_URL,
-  STUN_URL
+  LIVETALKING_REF, GITHUB_PROXY_PREFIX, HF_ENDPOINT, TORCH_HOME,
+  PIP_INDEX_URL, PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL,
+  MINICONDA_INSTALLER_URL, STUN_URL
 EOF
 }
 
@@ -231,6 +232,7 @@ verify_deployment() {
   require_file "${LIVETALKING_DIR}/models/whisper/pytorch_model.bin"
   require_file "${LIVETALKING_DIR}/models/face-parse-bisent/79999_iter.pth"
   require_file "${LIVETALKING_DIR}/models/face-parse-bisent/resnet18-5c106cde.pth"
+  require_file "${TORCH_HOME}/hub/checkpoints/s3fd-619a316812.pth"
   verify_sha256 \
     7ebf6c98c181e20838e4c0054e96e944ac60d5d692cc01db42839fe11b787007 \
     "${LIVETALKING_DIR}/models/musetalkV15/unet.pth"
@@ -240,6 +242,9 @@ verify_deployment() {
   verify_sha256 \
     5c106cde386e87d4033832f2996f5493238eda96ccf559d1d62760c4de0613f8 \
     "${LIVETALKING_DIR}/models/face-parse-bisent/resnet18-5c106cde.pth"
+  verify_sha256 \
+    619a31681264d3f7f7fc7a16a42cbbe8b23f31a256f75a366e5a1bcd59b33543 \
+    "${TORCH_HOME}/hub/checkpoints/s3fd-619a316812.pth"
   [[ "$(git -C "${LIVETALKING_DIR}" rev-parse HEAD)" == "${LIVETALKING_REF}" ]] || \
     die "LiveTalking is not at the pinned revision ${LIVETALKING_REF}."
   [[ -x "${LIVETALKING_PY}" ]] || die "LiveTalking Conda environment is missing."
@@ -303,9 +308,11 @@ mkdir -p \
   "${DATA_ROOT}/cache/pip" \
   "${DATA_ROOT}/cache/huggingface" \
   "${DATA_ROOT}/cache/npm" \
-  "${DATA_ROOT}/cache/uv"
+  "${DATA_ROOT}/cache/uv" \
+  "${TORCH_HOME}/hub/checkpoints"
 export PIP_CACHE_DIR="${DATA_ROOT}/cache/pip"
 export HF_HOME="${DATA_ROOT}/cache/huggingface"
+export TORCH_HOME
 export HF_ENDPOINT HF_HUB_DISABLE_XET=1
 export UV_DEFAULT_INDEX="${PIP_INDEX_URL}"
 export UV_CACHE_DIR="${DATA_ROOT}/cache/uv"
@@ -421,6 +428,9 @@ if ((SKIP_MODELS == 0)); then
   conda_run "${LIVETALKING_ENV}" hf download ManyOtherFunctions/face-parse-bisent \
     "79999_iter.pth" "resnet18-5c106cde.pth" \
     --local-dir "${LIVETALKING_DIR}/models/face-parse-bisent"
+  conda_run "${LIVETALKING_ENV}" hf download n0x1103/s3fd \
+    "s3fd-619a316812.pth" \
+    --local-dir "${TORCH_HOME}/hub/checkpoints"
 
 fi
 
@@ -517,6 +527,7 @@ User=${DEPLOY_USER}
 Group=${DEPLOY_GROUP}
 WorkingDirectory=${LIVETALKING_DIR}
 Environment=TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
+Environment=TORCH_HOME=${TORCH_HOME}
 ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size 4 --fps 25 --listenport 8010 --stun ${STUN_URL}
 Restart=on-failure
 RestartSec=5
