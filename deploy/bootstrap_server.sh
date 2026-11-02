@@ -12,6 +12,7 @@ LIVETALKING_REPO_URL="${LIVETALKING_REPO_URL:-https://github.com/lipku/LiveTalki
 LIVETALKING_REF="${LIVETALKING_REF:-c7269433a2b6ecebcd9342445d2ecc882c98b0da}"
 GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 PUBLIC_IP="${PUBLIC_IP:-36.103.177.214}"
+PUBLIC_PORT="${PUBLIC_PORT:-9000}"
 STUN_URL="${STUN_URL:-stun:stun.freeswitch.org:3478}"
 HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 TORCH_HOME="${TORCH_HOME:-${DATA_ROOT}/cache/torch}"
@@ -39,6 +40,7 @@ and an Nginx public entrypoint on Ubuntu 22.04.
 
 Options:
   --public-ip IP             Public IPv4 used in CORS (default: 36.103.177.214)
+  --public-port PORT         Nginx public HTTP port (default: 9000)
   --enable-silence-inference Apply the optional zero-audio MuseTalk patch
   --skip-apt                 Do not install Ubuntu packages
   --skip-models              Do not download model weights
@@ -50,7 +52,7 @@ Environment overrides:
   DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, LIVETALKING_REPO_URL,
   LIVETALKING_REF, GITHUB_PROXY_PREFIX, HF_ENDPOINT, TORCH_HOME,
   PIP_INDEX_URL, PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL,
-  MINICONDA_INSTALLER_URL, STUN_URL
+  MINICONDA_INSTALLER_URL, STUN_URL, PUBLIC_PORT
 EOF
 }
 
@@ -128,6 +130,7 @@ require_option_value() {
 while (($#)); do
   case "$1" in
     --public-ip) require_option_value "$1" "${2:-}"; PUBLIC_IP="$2"; shift 2 ;;
+    --public-port) require_option_value "$1" "${2:-}"; PUBLIC_PORT="$2"; shift 2 ;;
     --enable-silence-inference) ENABLE_SILENCE_INFERENCE=1; shift ;;
     --skip-apt) SKIP_APT=1; shift ;;
     --skip-models) SKIP_MODELS=1; shift ;;
@@ -137,6 +140,15 @@ while (($#)); do
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+[[ "${PUBLIC_PORT}" =~ ^[0-9]+$ ]] || die "Public port must be numeric."
+((PUBLIC_PORT >= 1 && PUBLIC_PORT <= 65535)) || \
+  die "Public port must be between 1 and 65535."
+if [[ "${PUBLIC_PORT}" == 80 ]]; then
+  PUBLIC_ORIGIN="http://${PUBLIC_IP}"
+else
+  PUBLIC_ORIGIN="http://${PUBLIC_IP}:${PUBLIC_PORT}"
+fi
 
 if [[ "${EUID}" -eq 0 ]]; then
   DEPLOY_USER="${SUDO_USER:-root}"
@@ -437,7 +449,7 @@ fi
 set_env_value "${PROJECT_DIR}/backend/.env" APP_HOST 127.0.0.1
 set_env_value "${PROJECT_DIR}/backend/.env" APP_PORT 8001
 set_env_value "${PROJECT_DIR}/backend/.env" \
-  CORS_ORIGINS "http://${PUBLIC_IP},http://${PUBLIC_IP}:5173,http://${PUBLIC_IP}:4173"
+  CORS_ORIGINS "${PUBLIC_ORIGIN},http://${PUBLIC_IP}:5173,http://${PUBLIC_IP}:4173"
 set_env_value "${PROJECT_DIR}/backend/.env" \
   LIVETALKING_BASE_URL http://127.0.0.1:8010
 
@@ -512,8 +524,8 @@ EOF
 
   "${SUDO[@]}" tee /etc/nginx/sites-available/digital-human >/dev/null <<EOF
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    listen ${PUBLIC_PORT} default_server;
+    listen [::]:${PUBLIC_PORT} default_server;
     server_name _;
     root ${PROJECT_DIR}/frontend/dist;
     index index.html;
@@ -565,7 +577,7 @@ verify_deployment
 cat <<EOF
 
 Installation finished.
-Public page: http://${PUBLIC_IP}/
+Public page: ${PUBLIC_ORIGIN}/
 Backend env: ${PROJECT_DIR}/backend/.env
 LiveTalking: ${LIVETALKING_DIR}
 

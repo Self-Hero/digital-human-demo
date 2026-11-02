@@ -8,7 +8,7 @@ SoulX 与 MuseTalk 安装到同一个 Python 环境。
 - NVIDIA 驱动已经可用，`nvidia-smi` 能识别 RTX 4090
 - `/data` 已挂载并且至少剩余 30GB（当前 100GB 数据盘足够）
 - 当前项目放在服务器的 `/data/digital-human-demo`
-- 云安全组已开放 `22/tcp`、`80/tcp`，以及服务器
+- 云安全组已开放 `22/tcp`、`9000/tcp`，以及服务器
   `cat /proc/sys/net/ipv4/ip_local_port_range` 显示的 UDP 范围
 
 脚本不会覆盖已有的 `backend/.env`，因此豆包凭证可以安全保留。
@@ -22,10 +22,11 @@ SoulX 与 MuseTalk 安装到同一个 Python 环境。
 ```bash
 git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-human-demo
 cd /data/digital-human-demo
-bash deploy/bootstrap_server.sh --public-ip 36.103.177.214
+bash deploy/bootstrap_server.sh --public-ip 36.103.177.214 --public-port 9000
 ```
 
-换服务器时把 `--public-ip` 改为新机器公网 IP。脚本默认使用清华 Miniconda/Conda/PyPI、
+换服务器时把 `--public-ip` 改为新机器公网 IP。当前云平台限制 `80/443/8080`，因此默认使用
+`9000`；云安全组必须放行 `9000/tcp`。其他平台可传入 `--public-port 80`。脚本默认使用清华 Miniconda/Conda/PyPI、
 Hugging Face 镜像和 npmmirror；PyTorch CUDA wheel 仍从 PyTorch 官方源下载。下载中断后
 直接执行同一条命令，pip/Hugging Face 缓存保存在 `/data/cache`，不会从头重复下载完整文件。
 
@@ -80,7 +81,7 @@ sudo journalctl -u digital-human-backend -f
 sudo journalctl -u livetalking@ma_renda_dynamic -f
 ```
 
-公网页面默认为 `http://36.103.177.214/`。普通公网 HTTP 通常无法获得浏览器麦克风权限；
+公网页面默认为 `http://36.103.177.214:9000/`。普通公网 HTTP 通常无法获得浏览器麦克风权限；
 完整语音联调仍需域名和可信 HTTPS。TURN 默认不部署，前后端使用 STUN；复杂网络下 ICE
 失败时再按 [PUBLIC_SERVER_DEPLOYMENT.md](PUBLIC_SERVER_DEPLOYMENT.md) 增加 TURN。
 

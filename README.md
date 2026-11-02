@@ -18,7 +18,7 @@
 ```bash
 git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-human-demo
 cd /data/digital-human-demo
-bash deploy/bootstrap_server.sh --public-ip 36.103.177.214
+bash deploy/bootstrap_server.sh --public-ip 36.103.177.214 --public-port 9000
 ```
 
 安装完成后，单独处理人物素材并启动 LiveTalking：
@@ -28,6 +28,9 @@ bash deploy/start_avatar.sh \
   --avatar-source /data/source/dameng_slient2.mp4 \
   --avatar-id ma_renda_dynamic
 ```
+
+公网页面默认访问 `http://36.103.177.214:9000/`。云安全组需要放行
+`9000/tcp`；其他云平台可通过 `--public-port 80` 改回标准 HTTP 端口。
 
 后端本地启动：
 
