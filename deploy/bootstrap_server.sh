@@ -422,6 +422,12 @@ set_env_value "${PROJECT_DIR}/frontend/.env.production" VITE_STUN_URL "${STUN_UR
 )
 
 log "Applying maintained LiveTalking compatibility patches"
+# Upstream's utils directory is missing a package marker. Without it, an
+# unrelated top-level utils module can shadow utils.logger on Python 3.12.
+if [[ ! -f "${LIVETALKING_DIR}/utils/__init__.py" ]]; then
+  printf '%s\n' '"""LiveTalking utility package."""' > \
+    "${LIVETALKING_DIR}/utils/__init__.py"
+fi
 "${BACKEND_PY}" "${PROJECT_DIR}/backend/scripts/configure_livetalking_video.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 if ((ENABLE_SILENCE_INFERENCE)); then
