@@ -371,6 +371,19 @@ conda_run "${LIVETALKING_ENV}" python -m pip install \
   "huggingface_hub[cli]" gdown -i "${PIP_INDEX_URL}" \
   --timeout 180 --retries 10
 
+# LiveTalking's MuseTalk avatar preprocessor imports face_recognition, but the
+# pinned upstream requirements omit it. Install dlib from conda-forge to avoid
+# an expensive and fragile local C++ build on Python 3.12.
+if ! conda_run "${LIVETALKING_ENV}" python -c \
+  "import dlib, face_recognition" >/dev/null 2>&1; then
+  log "Installing MuseTalk face landmark dependencies"
+  "${CONDA_BIN}" install -y -n "${LIVETALKING_ENV}" --override-channels \
+    -c "${CONDA_CHANNEL}" dlib
+  conda_run "${LIVETALKING_ENV}" python -m pip install --no-deps \
+    face-recognition-models==0.3.0 face-recognition==1.3.0 \
+    -i "${PIP_INDEX_URL}" --timeout 180 --retries 10
+fi
+
 if ((SKIP_MODELS == 0)); then
   log "Downloading MuseTalk 1.5 runtime models"
   mkdir -p "${LIVETALKING_DIR}/models"
