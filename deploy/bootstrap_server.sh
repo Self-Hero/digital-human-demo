@@ -279,14 +279,16 @@ if ! conda_run "${LIVETALKING_ENV}" python -c \
     -i "${PIP_INDEX_URL}"
   conda_run "${LIVETALKING_ENV}" python -m pip install \
     torch==2.9.1+cu128 torchvision==0.24.1+cu128 torchaudio==2.9.1+cu128 \
-    --index-url "${PYTORCH_INDEX_URL}" --timeout 180 --retries 10
+    -i "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}" \
+    --timeout 180 --retries 10
 fi
 
 if [[ ! -d "${LIVETALKING_DIR}/.git" ]]; then
   [[ ! -e "${LIVETALKING_DIR}" ]] || \
     die "${LIVETALKING_DIR} exists but is not a Git checkout. Move it aside and rerun."
   log "Cloning LiveTalking"
-  git clone "${LIVETALKING_REPO_URL}" "${LIVETALKING_DIR}"
+  git -c http.version=HTTP/1.1 clone \
+    "${LIVETALKING_REPO_URL}" "${LIVETALKING_DIR}"
 fi
 
 current_ref="$(git -C "${LIVETALKING_DIR}" rev-parse HEAD)"
@@ -294,7 +296,8 @@ if [[ "${current_ref}" != "${LIVETALKING_REF}" ]]; then
   [[ -z "$(git -C "${LIVETALKING_DIR}" status --porcelain --untracked-files=no)" ]] || \
     die "LiveTalking has local tracked changes; refusing to switch commits."
   log "Pinning LiveTalking to ${LIVETALKING_REF}"
-  git -C "${LIVETALKING_DIR}" fetch origin "${LIVETALKING_REF}"
+  git -c http.version=HTTP/1.1 -C "${LIVETALKING_DIR}" \
+    fetch origin "${LIVETALKING_REF}"
   git -C "${LIVETALKING_DIR}" checkout --detach "${LIVETALKING_REF}"
 fi
 
