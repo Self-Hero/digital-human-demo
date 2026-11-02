@@ -375,19 +375,19 @@ if ((SKIP_MODELS == 0)); then
   log "Downloading MuseTalk 1.5 runtime models"
   mkdir -p "${LIVETALKING_DIR}/models"
   conda_run "${LIVETALKING_ENV}" hf download TMElyralab/MuseTalk \
-    --include "musetalkV15/musetalk.json" "musetalkV15/unet.pth" \
+    "musetalkV15/musetalk.json" "musetalkV15/unet.pth" \
     --local-dir "${LIVETALKING_DIR}/models"
   conda_run "${LIVETALKING_ENV}" hf download stabilityai/sd-vae-ft-mse \
-    --include "config.json" "diffusion_pytorch_model.bin" \
+    "config.json" "diffusion_pytorch_model.bin" \
     --local-dir "${LIVETALKING_DIR}/models/sd-vae"
   conda_run "${LIVETALKING_ENV}" hf download openai/whisper-tiny \
-    --include "config.json" "pytorch_model.bin" "preprocessor_config.json" \
+    "config.json" "pytorch_model.bin" "preprocessor_config.json" \
     --local-dir "${LIVETALKING_DIR}/models/whisper"
 
   # This mirrors the exact face parser files referenced by MuseTalk's official
   # download script. Fixed LFS digests prevent accepting altered mirror files.
   conda_run "${LIVETALKING_ENV}" hf download ManyOtherFunctions/face-parse-bisent \
-    --include "79999_iter.pth" "resnet18-5c106cde.pth" \
+    "79999_iter.pth" "resnet18-5c106cde.pth" \
     --local-dir "${LIVETALKING_DIR}/models/face-parse-bisent"
 
 fi
