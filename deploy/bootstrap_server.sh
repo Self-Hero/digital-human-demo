@@ -10,6 +10,7 @@ CONDA_ROOT="${CONDA_ROOT:-${DATA_ROOT}/miniconda3}"
 LIVETALKING_DIR="${LIVETALKING_DIR:-${DATA_ROOT}/LiveTalking}"
 LIVETALKING_REPO_URL="${LIVETALKING_REPO_URL:-https://github.com/lipku/LiveTalking.git}"
 LIVETALKING_REF="${LIVETALKING_REF:-c7269433a2b6ecebcd9342445d2ecc882c98b0da}"
+GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 PUBLIC_IP="${PUBLIC_IP:-36.103.177.214}"
 STUN_URL="${STUN_URL:-stun:stun.freeswitch.org:3478}"
 HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
@@ -49,14 +50,76 @@ Options:
 
 Environment overrides:
   DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, LIVETALKING_REPO_URL,
-  LIVETALKING_REF, HF_ENDPOINT, PIP_INDEX_URL, PYTORCH_INDEX_URL,
-  NPM_REGISTRY, CONDA_CHANNEL, MINICONDA_INSTALLER_URL, STUN_URL
+  LIVETALKING_REF, GITHUB_PROXY_PREFIX, HF_ENDPOINT, PIP_INDEX_URL,
+  PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL, MINICONDA_INSTALLER_URL,
+  STUN_URL
 EOF
 }
 
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 warn() { echo "WARNING: $*" >&2; }
+
+github_proxy_url() {
+  local url="$1"
+  if [[ -n "${GITHUB_PROXY_PREFIX}" && "${url}" == https://github.com/* ]]; then
+    printf '%s%s\n' "${GITHUB_PROXY_PREFIX%/}/" "${url}"
+  else
+    printf '%s\n' "${url}"
+  fi
+}
+
+preserve_failed_clone() {
+  local attempt="$1"
+  if [[ -e "${LIVETALKING_DIR}" ]]; then
+    local failed_dir="${LIVETALKING_DIR}.clone-failed-$(date '+%Y%m%d-%H%M%S')-${attempt}"
+    warn "Preserving the failed clone at ${failed_dir}"
+    mv "${LIVETALKING_DIR}" "${failed_dir}"
+  fi
+}
+
+clone_livetalking() {
+  local proxy_url attempt
+  if git -c http.version=HTTP/1.1 clone \
+    "${LIVETALKING_REPO_URL}" "${LIVETALKING_DIR}"; then
+    return 0
+  fi
+
+  preserve_failed_clone direct
+  proxy_url="$(github_proxy_url "${LIVETALKING_REPO_URL}")"
+  [[ "${proxy_url}" != "${LIVETALKING_REPO_URL}" ]] || return 1
+  warn "Direct GitHub clone failed; falling back to ${proxy_url}"
+
+  for attempt in 1 2 3; do
+    if git -c http.version=HTTP/1.1 clone \
+      "${proxy_url}" "${LIVETALKING_DIR}"; then
+      return 0
+    fi
+    preserve_failed_clone "proxy-${attempt}"
+    ((attempt < 3)) && sleep $((attempt * 5))
+  done
+  return 1
+}
+
+fetch_livetalking_ref() {
+  local proxy_url attempt
+  if git -c http.version=HTTP/1.1 -C "${LIVETALKING_DIR}" \
+    fetch origin "${LIVETALKING_REF}"; then
+    return 0
+  fi
+
+  proxy_url="$(github_proxy_url "${LIVETALKING_REPO_URL}")"
+  [[ "${proxy_url}" != "${LIVETALKING_REPO_URL}" ]] || return 1
+  warn "Direct GitHub fetch failed; falling back to ${proxy_url}"
+  for attempt in 1 2 3; do
+    if git -c http.version=HTTP/1.1 -C "${LIVETALKING_DIR}" \
+      fetch "${proxy_url}" "${LIVETALKING_REF}"; then
+      return 0
+    fi
+    ((attempt < 3)) && sleep $((attempt * 5))
+  done
+  return 1
+}
 
 require_option_value() {
   local option="$1"
@@ -287,8 +350,7 @@ if [[ ! -d "${LIVETALKING_DIR}/.git" ]]; then
   [[ ! -e "${LIVETALKING_DIR}" ]] || \
     die "${LIVETALKING_DIR} exists but is not a Git checkout. Move it aside and rerun."
   log "Cloning LiveTalking"
-  git -c http.version=HTTP/1.1 clone \
-    "${LIVETALKING_REPO_URL}" "${LIVETALKING_DIR}"
+  clone_livetalking || die "Unable to clone LiveTalking from GitHub or its configured proxy."
 fi
 
 current_ref="$(git -C "${LIVETALKING_DIR}" rev-parse HEAD)"
@@ -296,8 +358,8 @@ if [[ "${current_ref}" != "${LIVETALKING_REF}" ]]; then
   [[ -z "$(git -C "${LIVETALKING_DIR}" status --porcelain --untracked-files=no)" ]] || \
     die "LiveTalking has local tracked changes; refusing to switch commits."
   log "Pinning LiveTalking to ${LIVETALKING_REF}"
-  git -c http.version=HTTP/1.1 -C "${LIVETALKING_DIR}" \
-    fetch origin "${LIVETALKING_REF}"
+  fetch_livetalking_ref || \
+    die "Unable to fetch LiveTalking revision ${LIVETALKING_REF}."
   git -C "${LIVETALKING_DIR}" checkout --detach "${LIVETALKING_REF}"
 fi
 
