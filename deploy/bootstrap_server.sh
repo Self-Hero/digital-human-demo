@@ -377,8 +377,8 @@ conda_run "${LIVETALKING_ENV}" python -m pip install \
 if ! conda_run "${LIVETALKING_ENV}" python -c \
   "import dlib, face_recognition" >/dev/null 2>&1; then
   log "Installing MuseTalk face landmark dependencies"
-  "${CONDA_BIN}" install -y -n "${LIVETALKING_ENV}" --override-channels \
-    -c "${CONDA_CHANNEL}" dlib "libdlib=*=cpu_*"
+  CONDA_OVERRIDE_CUDA="" "${CONDA_BIN}" install -y -n "${LIVETALKING_ENV}" \
+    --override-channels -c "${CONDA_CHANNEL}" dlib
   conda_run "${LIVETALKING_ENV}" python -m pip install --no-deps \
     face-recognition-models==0.3.0 face-recognition==1.3.0 \
     -i "${PIP_INDEX_URL}" --timeout 180 --retries 10
