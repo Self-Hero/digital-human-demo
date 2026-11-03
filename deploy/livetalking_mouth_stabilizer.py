@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import time
 
 import cv2
 import numpy as np
 
-logger = logging.getLogger(__name__)
+try:
+    # LiveTalking configures this logger for both its service journal and log file.
+    from utils.logger import logger
+except ImportError:  # Allow standalone checks outside a LiveTalking checkout.
+    import logging
+
+    logger = logging.getLogger(__name__)
 
 
 def _env_enabled(name: str, default: str) -> bool:
