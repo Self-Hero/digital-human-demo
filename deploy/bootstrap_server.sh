@@ -256,11 +256,12 @@ verify_deployment() {
     die "LiveTalking is not at the pinned revision ${LIVETALKING_REF}."
   [[ -x "${LIVETALKING_PY}" ]] || die "LiveTalking Conda environment is missing."
   [[ -x "${BACKEND_UVICORN}" ]] || die "Backend virtual environment is missing."
+  require_file "${LIVETALKING_DIR}/server/pcm_stream.py"
 
   (
     cd "${LIVETALKING_DIR}"
     conda_run "${LIVETALKING_ENV}" python -c \
-      "import torch, cv2, aiortc, diffusers, transformers; import face_recognition_models, face_recognition; import avatars.musetalk_avatar; import avatars.musetalk.genavatar; assert torch.__version__.startswith('2.9.1+cu128'), torch.__version__; assert torch.cuda.is_available(); print('LiveTalking imports OK; torch', torch.__version__, 'cuda', torch.version.cuda, 'gpu', torch.cuda.get_device_name(0))"
+      "import torch, cv2, aiortc, diffusers, transformers, soxr; import face_recognition_models, face_recognition; import avatars.musetalk_avatar; import avatars.musetalk.genavatar; import server.pcm_stream; assert torch.__version__.startswith('2.9.1+cu128'), torch.__version__; assert torch.cuda.is_available(); print('LiveTalking imports OK; torch', torch.__version__, 'cuda', torch.version.cuda, 'gpu', torch.cuda.get_device_name(0))"
   )
   "${BACKEND_PY}" -c "import fastapi, httpx, websockets; print('backend imports OK')"
   conda_run "${APP_ENV}" node --version
@@ -470,6 +471,11 @@ if [[ ! -f "${LIVETALKING_DIR}/utils/__init__.py" ]]; then
   printf '%s\n' '"""LiveTalking utility package."""' > \
     "${LIVETALKING_DIR}/utils/__init__.py"
 fi
+cp "${PROJECT_DIR}/deploy/livetalking_pcm_stream.py" \
+  "${LIVETALKING_DIR}/server/pcm_stream.py"
+"${BACKEND_PY}" \
+  "${PROJECT_DIR}/backend/scripts/configure_livetalking_pcm_stream.py" \
+  --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" "${PROJECT_DIR}/backend/scripts/configure_livetalking_video.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 if ((ENABLE_SILENCE_INFERENCE)); then
@@ -514,6 +520,7 @@ Group=${DEPLOY_GROUP}
 WorkingDirectory=${LIVETALKING_DIR}
 Environment=TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 Environment=TORCH_HOME=${TORCH_HOME}
+Environment=LIVETALKING_PCM_PREBUFFER_MS=200
 ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size 4 --fps 25 --listenport 8010 --stun ${STUN_URL}
 Restart=on-failure
 RestartSec=5

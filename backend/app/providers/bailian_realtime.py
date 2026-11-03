@@ -184,6 +184,12 @@ class BailianRealtimeBridge:
                         }
                     )
             elif event_type == "response.audio.delta":
+                if current_turn_id is None:
+                    current_turn_id = str(uuid4())
+                    response_started_at = time.perf_counter()
+                    await send(
+                        {"type": "turn.started", "turnId": current_turn_id}
+                    )
                 now = time.perf_counter()
                 if first_audio_ms is None and speech_ended_at is not None:
                     first_audio_ms = int((now - speech_ended_at) * 1000)
@@ -201,7 +207,9 @@ class BailianRealtimeBridge:
                 if audio_sink is not None:
                     delta = event.get("delta", "")
                     if isinstance(delta, str) and delta:
-                        await audio_sink.append(base64.b64decode(delta))
+                        await audio_sink.append(
+                            base64.b64decode(delta), current_turn_id
+                        )
             elif event_type == "response.audio_transcript.delta":
                 delta = str(event.get("delta", ""))
                 if delta:

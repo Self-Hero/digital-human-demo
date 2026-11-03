@@ -262,7 +262,7 @@ class DoubaoRealtimeBridge:
                 "sampleRate": 24_000,
             }
         )
-        await audio_sink.append(pcm)
+        await audio_sink.append(pcm, self._current_turn_id)
 
     async def _handle_event(self, message: ServerMessage, send, audio_sink) -> bool:
         event = message.event

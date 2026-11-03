@@ -34,12 +34,12 @@ class FakeUpstream:
 
 class FakeAudioSink:
     def __init__(self) -> None:
-        self.appended: list[bytes] = []
+        self.appended: list[tuple[bytes, str]] = []
         self.flush_count = 0
         self.interrupt_count = 0
 
-    async def append(self, pcm: bytes) -> None:
-        self.appended.append(pcm)
+    async def append(self, pcm: bytes, turn_id: str) -> None:
+        self.appended.append((pcm, turn_id))
 
     async def flush(self) -> None:
         self.flush_count += 1
@@ -149,7 +149,9 @@ def test_upstream_events_are_mapped_to_browser_and_livetalking() -> None:
     assert received[-1] == {"type": "session.state", "state": "idle"}
     audio_event = next(event for event in received if event["type"] == "audio.delta")
     assert base64.b64decode(audio_event["audio"]) == pcm
-    assert sink.appended == [pcm]
+    assert len(sink.appended) == 1
+    assert sink.appended[0][0] == pcm
+    assert sink.appended[0][1]
     assert sink.interrupt_count == 1
     assert sink.flush_count == 1
 

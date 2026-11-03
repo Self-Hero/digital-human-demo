@@ -72,6 +72,12 @@ bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 
 ## 验证与日志
 
+回复音频通过本项目维护的 `/humanpcm` WebSocket 补丁连续送入 LiveTalking。
+豆包返回的 24 kHz、16 bit、单声道 PCM 会在 LiveTalking 内持续重采样为
+16 kHz，并按 20 ms 帧送入 MuseTalk。每轮回答只产生一次 `start` 和一次
+`end`。服务默认先缓冲 200 ms 音频，避免分块到达抖动让音频队列见底并
+切回闭嘴待机状态；可通过 systemd 中的 `LIVETALKING_PCM_PREBUFFER_MS` 调整。
+
 ```bash
 bash deploy/bootstrap_server.sh --verify-only
 
