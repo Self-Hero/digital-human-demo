@@ -528,8 +528,9 @@ Environment=TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 Environment=TORCH_HOME=${TORCH_HOME}
 Environment=LIVETALKING_PCM_PREBUFFER_MS=200
 Environment=LIVETALKING_MOUTH_STABILIZER=1
-Environment=LIVETALKING_MOUTH_STRENGTH=0.18
+Environment=LIVETALKING_MOUTH_STRENGTH=0.22
 Environment=LIVETALKING_MOUTH_MOTION_THRESHOLD=0.12
+Environment=LIVETALKING_MOUTH_TRANSITION_FRAMES=3
 ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size 4 --fps 25 --listenport 8010 --stun ${STUN_URL}
 Restart=on-failure
 RestartSec=5

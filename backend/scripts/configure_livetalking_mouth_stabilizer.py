@@ -25,8 +25,12 @@ PATCHED_AVATAR = """        self.frame_list_cycle,self.mask_list_cycle,self.coor
 BLEND_ANCHOR = """        combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
         return combine_frame
 """
-PATCHED_BLEND = """        combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
+LEGACY_PATCHED_BLEND = """        combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
         combine_frame = self.mouth_stabilizer.apply(combine_frame, bbox)
+        return combine_frame
+"""
+PATCHED_BLEND = """        combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
+        combine_frame = self.mouth_stabilizer.apply(combine_frame, bbox, ori_frame)
         return combine_frame
 """
 
@@ -42,6 +46,21 @@ def configure(source: Path) -> str:
     text = source.read_text(encoding="utf-8")
     if PATCHED_IMPORT in text and PATCHED_BLEND in text:
         return "already configured"
+
+    if PATCHED_IMPORT in text and LEGACY_PATCHED_BLEND in text:
+        updated = _replace_once(
+            text,
+            LEGACY_PATCHED_BLEND,
+            PATCHED_BLEND,
+            "legacy MuseTalk frame blend",
+        )
+        source.write_text(updated, encoding="utf-8")
+        try:
+            py_compile.compile(str(source), doraise=True)
+        except Exception:
+            source.write_text(text, encoding="utf-8")
+            raise
+        return "upgraded existing configuration"
 
     updated = _replace_once(text, IMPORT_ANCHOR, PATCHED_IMPORT, "BaseAvatar import")
     updated = _replace_once(

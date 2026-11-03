@@ -4,6 +4,7 @@ from scripts.configure_livetalking_mouth_stabilizer import (
     AVATAR_ANCHOR,
     BLEND_ANCHOR,
     IMPORT_ANCHOR,
+    LEGACY_PATCHED_BLEND,
     PATCHED_AVATAR,
     PATCHED_BLEND,
     PATCHED_IMPORT,
@@ -47,3 +48,21 @@ def test_configure_rejects_unknown_musetalk_source(tmp_path: Path) -> None:
         assert "Expected one BaseAvatar import" in str(exc)
     else:
         raise AssertionError("configure() should reject an unknown source layout")
+
+
+def test_configure_upgrades_existing_stabilizer_patch(tmp_path: Path) -> None:
+    source = tmp_path / "musetalk_avatar.py"
+    original = (
+        PATCHED_IMPORT
+        + "\nclass MuseReal:\n"
+        + "    def paste_back_frame(self, pred_frame, idx):\n"
+        + LEGACY_PATCHED_BLEND
+    )
+    source.write_text(original, encoding="utf-8")
+
+    result = configure(source)
+    updated = source.read_text(encoding="utf-8")
+
+    assert result == "upgraded existing configuration"
+    assert PATCHED_BLEND in updated
+    assert LEGACY_PATCHED_BLEND not in updated

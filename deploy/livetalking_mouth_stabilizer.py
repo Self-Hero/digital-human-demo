@@ -35,7 +35,7 @@ class MouthTemporalStabilizer:
     def __init__(self) -> None:
         self.enabled = _env_enabled("LIVETALKING_MOUTH_STABILIZER", "0")
         self.strength = _env_float(
-            "LIVETALKING_MOUTH_STRENGTH", 0.18, 0.0, 0.35
+            "LIVETALKING_MOUTH_STRENGTH", 0.22, 0.0, 0.35
         )
         self.motion_threshold = _env_float(
             "LIVETALKING_MOUTH_MOTION_THRESHOLD", 0.12, 0.02, 0.5
@@ -43,21 +43,33 @@ class MouthTemporalStabilizer:
         self.reset_gap_seconds = _env_float(
             "LIVETALKING_MOUTH_RESET_GAP_SECONDS", 0.75, 0.2, 5.0
         )
+        self.transition_frames = int(
+            _env_float("LIVETALKING_MOUTH_TRANSITION_FRAMES", 3, 0, 12)
+        )
         self._previous: np.ndarray | None = None
         self._last_frame_at = 0.0
+        self._transition_index = 0
         self._mask_cache: dict[tuple[int, int], np.ndarray] = {}
         logger.info(
-            "MuseTalk mouth stabilizer: enabled=%s strength=%.3f threshold=%.3f",
+            "MuseTalk mouth stabilizer: enabled=%s strength=%.3f "
+            "threshold=%.3f transition_frames=%d",
             self.enabled,
             self.strength,
             self.motion_threshold,
+            self.transition_frames,
         )
 
     def reset(self) -> None:
         self._previous = None
         self._last_frame_at = 0.0
+        self._transition_index = 0
 
-    def apply(self, frame: np.ndarray, bbox) -> np.ndarray:
+    def apply(
+        self,
+        frame: np.ndarray,
+        bbox,
+        reference_frame: np.ndarray | None = None,
+    ) -> np.ndarray:
         if not self.enabled or self.strength <= 0:
             return frame
 
@@ -74,9 +86,12 @@ class MouthTemporalStabilizer:
         now = time.monotonic()
         if now - self._last_frame_at > self.reset_gap_seconds:
             self._previous = None
+            self._transition_index = 0
         self._last_frame_at = now
 
         if self._previous is None:
+            current = self._blend_entry(current, reference_frame, roi_box)
+            frame[y1:y2, x1:x2] = current
             self._previous = current
             return frame
 
@@ -114,11 +129,55 @@ class MouthTemporalStabilizer:
                 current.astype(np.float32) * (1.0 - mask)
                 + blended.astype(np.float32) * mask
             ).clip(0, 255).astype(np.uint8)
-            frame[y1:y2, x1:x2] = result
-            self._previous = result
         else:
-            self._previous = current
+            result = current
+
+        result = self._blend_entry(result, reference_frame, roi_box)
+        frame[y1:y2, x1:x2] = result
+        self._previous = result
         return frame
+
+    def _blend_entry(
+        self,
+        generated: np.ndarray,
+        reference_frame: np.ndarray | None,
+        roi_box: tuple[int, int, int, int],
+    ) -> np.ndarray:
+        if (
+            reference_frame is None
+            or self.transition_frames <= 0
+            or self._transition_index >= self.transition_frames
+        ):
+            return generated
+
+        x1, y1, x2, y2 = roi_box
+        reference = reference_frame[y1:y2, x1:x2]
+        if reference.shape != generated.shape:
+            self._transition_index = self.transition_frames
+            return generated
+
+        if self.transition_frames == 1:
+            generated_weight = 1.0
+        else:
+            generated_weight = 0.5 + 0.5 * (
+                self._transition_index / (self.transition_frames - 1)
+            )
+        self._transition_index += 1
+        if generated_weight >= 1.0:
+            return generated
+
+        blended = cv2.addWeighted(
+            reference,
+            1.0 - generated_weight,
+            generated,
+            generated_weight,
+            0.0,
+        )
+        mask = self._soft_mask(generated.shape[0], generated.shape[1])
+        return (
+            generated.astype(np.float32) * (1.0 - mask)
+            + blended.astype(np.float32) * mask
+        ).clip(0, 255).astype(np.uint8)
 
     @staticmethod
     def _mouth_box(frame_shape, bbox) -> tuple[int, int, int, int] | None:
