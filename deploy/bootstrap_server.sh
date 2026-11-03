@@ -484,6 +484,9 @@ cp "${PROJECT_DIR}/deploy/livetalking_mouth_stabilizer.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" "${PROJECT_DIR}/backend/scripts/configure_livetalking_video.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
+"${BACKEND_PY}" \
+  "${PROJECT_DIR}/backend/scripts/configure_livetalking_webrtc_bitrate.py" \
+  --livetalking-dir "${LIVETALKING_DIR}"
 if ((ENABLE_SILENCE_INFERENCE)); then
   "${BACKEND_PY}" \
     "${PROJECT_DIR}/backend/scripts/configure_livetalking_silence_inference.py" \
@@ -531,6 +534,9 @@ Environment=LIVETALKING_MOUTH_STABILIZER=1
 Environment=LIVETALKING_MOUTH_STRENGTH=0.22
 Environment=LIVETALKING_MOUTH_MOTION_THRESHOLD=0.12
 Environment=LIVETALKING_MOUTH_TRANSITION_FRAMES=3
+Environment=LIVETALKING_VIDEO_BITRATE_INITIAL=3000000
+Environment=LIVETALKING_VIDEO_BITRATE_MIN=1000000
+Environment=LIVETALKING_VIDEO_BITRATE_MAX=6000000
 ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size 4 --fps 25 --listenport 8010 --stun ${STUN_URL}
 Restart=on-failure
 RestartSec=5
