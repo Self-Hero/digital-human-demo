@@ -59,11 +59,9 @@ coturn 可用后，前端再启用：
 VITE_TURN_URL=turn:36.103.177.214:3478?transport=udp
 VITE_TURN_USERNAME=<turn-username>
 VITE_TURN_PASSWORD=<turn-password>
-VITE_TURN_FORCE_RELAY=false
 ```
 
-前端设置 TURN 后仍优先使用直接连接，直连失败时再回落到 TURN。只有诊断 TURN
-链路时才临时设置 `VITE_TURN_FORCE_RELAY=true`，强制所有媒体经过中继。
+前端设置 TURN 后会使用 `iceTransportPolicy=relay`；不设置时使用 STUN 和直接连接。
 
 ## 云安全组
 

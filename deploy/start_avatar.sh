@@ -132,16 +132,10 @@ if [[ ! -f "${FRONTEND_ENV}" ]]; then
   cp "${PROJECT_DIR}/frontend/.env.example" "${FRONTEND_ENV}"
 fi
 set_env_value "${FRONTEND_ENV}" VITE_AVATAR_ID "${AVATAR_ID}"
-set_env_value "${FRONTEND_ENV}" VITE_TURN_FORCE_RELAY false
 (
   cd "${PROJECT_DIR}/frontend"
   conda_run "${APP_ENV}" npm run build
 )
-
-log "Applying LiveTalking packet-loss recovery patches"
-conda_run "${APP_ENV}" python \
-  "${PROJECT_DIR}/backend/scripts/configure_livetalking_keyframes.py" \
-  --livetalking-dir "${LIVETALKING_DIR}"
 
 log "Starting LiveTalking avatar ${AVATAR_ID}"
 while read -r active_unit; do

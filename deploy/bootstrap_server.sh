@@ -487,9 +487,6 @@ cp "${PROJECT_DIR}/deploy/livetalking_mouth_stabilizer.py" \
 "${BACKEND_PY}" \
   "${PROJECT_DIR}/backend/scripts/configure_livetalking_webrtc_bitrate.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
-"${BACKEND_PY}" \
-  "${PROJECT_DIR}/backend/scripts/configure_livetalking_keyframes.py" \
-  --livetalking-dir "${LIVETALKING_DIR}"
 if ((ENABLE_SILENCE_INFERENCE)); then
   "${BACKEND_PY}" \
     "${PROJECT_DIR}/backend/scripts/configure_livetalking_silence_inference.py" \
@@ -531,7 +528,6 @@ User=${DEPLOY_USER}
 Group=${DEPLOY_GROUP}
 WorkingDirectory=${LIVETALKING_DIR}
 Environment=TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
-Environment=LIVETALKING_VIDEO_KEYFRAME_INTERVAL=2.0
 Environment=TORCH_HOME=${TORCH_HOME}
 Environment=LIVETALKING_PCM_PREBUFFER_MS=200
 Environment=LIVETALKING_MOUTH_STABILIZER=1
