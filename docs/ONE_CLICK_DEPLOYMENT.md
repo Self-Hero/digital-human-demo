@@ -78,6 +78,12 @@ bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 `end`。服务默认先缓冲 200 ms 音频，避免分块到达抖动让音频队列见底并
 切回闭嘴待机状态；可通过 systemd 中的 `LIVETALKING_PCM_PREBUFFER_MS` 调整。
 
+部署同时启用仅作用于嘴唇和牙齿区域的单向时序稳定器，用于减轻 MuseTalk
+逐帧生成造成的细微闪动。默认上一帧最大权重为 `0.18`，嘴型变化较大时会
+自动降低滤波强度，不增加未来帧等待。可通过
+`LIVETALKING_MOUTH_STABILIZER`、`LIVETALKING_MOUTH_STRENGTH` 和
+`LIVETALKING_MOUTH_MOTION_THRESHOLD` 调整或关闭。
+
 ```bash
 bash deploy/bootstrap_server.sh --verify-only
 
