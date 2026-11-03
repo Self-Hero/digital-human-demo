@@ -125,10 +125,12 @@ export function useConversation(
 
   useEffect(() => {
     let disposed = false;
+    let reconnectTimer: number | null = null;
+    let reconnectAttempt = 0;
 
-    async function connect() {
+    async function connect(existingSessionId?: string) {
       try {
-        const sessionId = await createSession();
+        const sessionId = existingSessionId ?? (await createSession());
         if (disposed) {
           await deleteSession(sessionId);
           return;
@@ -141,6 +143,7 @@ export function useConversation(
           const event = JSON.parse(message.data) as ServerEvent;
 
           if (event.type === "realtime.ready") {
+            reconnectAttempt = 0;
             const activeAvatarSession = avatarSessionIdRef.current;
             if (activeAvatarSession) {
               socket.send(
@@ -221,10 +224,15 @@ export function useConversation(
           setState("error");
         };
         socket.onclose = () => {
-          if (!disposed) {
-            releaseMicrophone();
-            setState("connecting");
-          }
+          if (disposed || socketRef.current !== socket) return;
+          socketRef.current = null;
+          setState("connecting");
+          const delay = Math.min(1_000 * 2 ** reconnectAttempt, 10_000);
+          reconnectAttempt += 1;
+          reconnectTimer = window.setTimeout(() => {
+            reconnectTimer = null;
+            void connect(sessionId);
+          }, delay);
         };
       } catch (connectionError) {
         setError(
@@ -239,6 +247,7 @@ export function useConversation(
     void connect();
     return () => {
       disposed = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       releaseMicrophone();
       clearPlayback();
       socketRef.current?.close();
