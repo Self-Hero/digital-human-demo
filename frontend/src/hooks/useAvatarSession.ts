@@ -66,6 +66,8 @@ export function useAvatarSession() {
     setError(null);
     const stunUrl = import.meta.env.VITE_STUN_URL;
     const turnUrl = import.meta.env.VITE_TURN_URL;
+    const forceTurnRelay =
+      import.meta.env.VITE_TURN_FORCE_RELAY?.toLowerCase() === "true";
     const iceServers: RTCIceServer[] = [];
     if (stunUrl) iceServers.push({ urls: stunUrl });
     if (turnUrl) {
@@ -78,7 +80,9 @@ export function useAvatarSession() {
     const peer = new RTCPeerConnection({
       sdpSemantics: "unified-plan",
       iceServers,
-      iceTransportPolicy: turnUrl ? "relay" : "all",
+      // TURN is a fallback by default. Forcing relay routes every media packet
+      // through the TURN host and should only be used as a diagnostic override.
+      iceTransportPolicy: turnUrl && forceTurnRelay ? "relay" : "all",
     });
     peerRef.current = peer;
 
