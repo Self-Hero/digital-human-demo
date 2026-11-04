@@ -89,7 +89,7 @@ conda_run liveportrait python -m pip install \
 HF_ENDPOINT="${HF_ENDPOINT}" HF_HUB_DISABLE_XET=1 \
   HF_HUB_DOWNLOAD_TIMEOUT=600 HF_HUB_ETAG_TIMEOUT=60 \
   conda_run liveportrait python -c \
-  "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', ignore_patterns=['*.git*', 'README.md', 'docs/*'], max_workers=1)"
+  "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', allow_patterns=['liveportrait/base_models/*', 'liveportrait/retargeting_models/*', 'liveportrait/landmark.onnx', 'insightface/models/buffalo_l/*'], max_workers=1)"
 
 log "Installing CodeFormer in a separate environment"
 clone_at_ref "https://github.com/sczhou/CodeFormer.git" \
@@ -119,7 +119,18 @@ download_release_file \
   "${CODEFORMER_DIR}/weights/facelib/parsing_parsenet.pth"
 
 log "Verifying the installation"
-test -s "${LIVEPORTRAIT_DIR}/pretrained_weights/liveportrait/base_models/appearance_feature_extractor.pth"
+for model_file in \
+  liveportrait/base_models/appearance_feature_extractor.pth \
+  liveportrait/base_models/motion_extractor.pth \
+  liveportrait/base_models/spade_generator.pth \
+  liveportrait/base_models/warping_module.pth \
+  liveportrait/landmark.onnx \
+  liveportrait/retargeting_models/stitching_retargeting_module.pth \
+  insightface/models/buffalo_l/2d106det.onnx \
+  insightface/models/buffalo_l/det_10g.onnx; do
+  test -s "${LIVEPORTRAIT_DIR}/pretrained_weights/${model_file}" || \
+    die "Missing LivePortrait model: ${model_file}"
+done
 test -s "${CODEFORMER_DIR}/weights/CodeFormer/codeformer.pth"
 conda_run liveportrait python -c "import torch, cv2, onnxruntime; assert torch.cuda.is_available(); print('LivePortrait CUDA:', torch.cuda.get_device_name(0))"
 conda_run codeformer python -c "import torch, cv2; assert torch.cuda.is_available(); print('CodeFormer CUDA:', torch.cuda.get_device_name(0))"
