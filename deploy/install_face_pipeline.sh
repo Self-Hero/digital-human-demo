@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 DATA_ROOT="${DATA_ROOT:-/data}"
 CONDA_ROOT="${CONDA_ROOT:-${DATA_ROOT}/miniconda3}"
 LIVEPORTRAIT_DIR="${LIVEPORTRAIT_DIR:-${DATA_ROOT}/LivePortrait}"
@@ -102,11 +104,8 @@ conda_run codeformer python -m pip install \
   torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
   --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
 conda_run codeformer python -m pip install \
-  --index-url "${PIP_INDEX_URL}" -r "${CODEFORMER_DIR}/requirements.txt"
-(
-  cd "${CODEFORMER_DIR}"
-  conda_run codeformer python basicsr/setup.py develop
-)
+  --index-url "${PIP_INDEX_URL}" \
+  -r "${PROJECT_DIR}/deploy/codeformer-inference-requirements.txt"
 
 download_release_file \
   "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth" \
@@ -133,7 +132,10 @@ for model_file in \
 done
 test -s "${CODEFORMER_DIR}/weights/CodeFormer/codeformer.pth"
 conda_run liveportrait python -c "import torch, cv2, onnxruntime; assert torch.cuda.is_available(); print('LivePortrait CUDA:', torch.cuda.get_device_name(0))"
-conda_run codeformer python -c "import torch, cv2; assert torch.cuda.is_available(); print('CodeFormer CUDA:', torch.cuda.get_device_name(0))"
+(
+  cd "${CODEFORMER_DIR}"
+  conda_run codeformer python -c "import torch, cv2, basicsr; from facelib.utils.face_restoration_helper import FaceRestoreHelper; assert torch.cuda.is_available(); print('CodeFormer CUDA:', torch.cuda.get_device_name(0))"
+)
 
 echo
 echo "Installation completed. No service was changed or restarted."
