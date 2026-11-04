@@ -107,6 +107,8 @@ conda_run codeformer python -m pip install \
 conda_run codeformer python -m pip install \
   --index-url "${PIP_INDEX_URL}" \
   -r "${PROJECT_DIR}/deploy/codeformer-inference-requirements.txt"
+cp "${PROJECT_DIR}/deploy/codeformer_basicsr_version.py" \
+  "${CODEFORMER_DIR}/basicsr/version.py"
 
 download_release_file \
   "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth" \
