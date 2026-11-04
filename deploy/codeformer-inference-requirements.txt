@@ -1,5 +1,6 @@
 addict==2.4.0
 future==1.0.0
+ffmpeg-python==0.2.0
 lmdb==1.7.5
 opencv-python==4.10.0.84
 PyYAML==6.0.3
