@@ -64,7 +64,8 @@ install_torch_prerequisites() {
 }
 
 download_release_file() {
-  local url="$1" destination="$2" temporary="${destination}.part"
+  local url="$1" destination="$2"
+  local temporary="${destination}.part"
   [[ -s "${destination}" ]] && return 0
   mkdir -p "$(dirname "${destination}")"
   if ! curl -fL --retry 5 --retry-delay 3 -o "${temporary}" \
