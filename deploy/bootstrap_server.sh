@@ -80,22 +80,22 @@ preserve_failed_clone() {
 
 clone_livetalking() {
   local proxy_url attempt
+  proxy_url="$(github_proxy_url "${LIVETALKING_REPO_URL}")"
   if git -c http.version=HTTP/1.1 clone \
-    "${LIVETALKING_REPO_URL}" "${LIVETALKING_DIR}"; then
+    "${proxy_url}" "${LIVETALKING_DIR}"; then
     return 0
   fi
 
-  preserve_failed_clone direct
-  proxy_url="$(github_proxy_url "${LIVETALKING_REPO_URL}")"
+  preserve_failed_clone proxy
   [[ "${proxy_url}" != "${LIVETALKING_REPO_URL}" ]] || return 1
-  warn "Direct GitHub clone failed; falling back to ${proxy_url}"
+  warn "GitHub proxy clone failed; falling back to the direct repository"
 
   for attempt in 1 2 3; do
     if git -c http.version=HTTP/1.1 clone \
-      "${proxy_url}" "${LIVETALKING_DIR}"; then
+      "${LIVETALKING_REPO_URL}" "${LIVETALKING_DIR}"; then
       return 0
     fi
-    preserve_failed_clone "proxy-${attempt}"
+    preserve_failed_clone "direct-${attempt}"
     ((attempt < 3)) && sleep $((attempt * 5))
   done
   return 1
@@ -103,17 +103,17 @@ clone_livetalking() {
 
 fetch_livetalking_ref() {
   local proxy_url attempt
+  proxy_url="$(github_proxy_url "${LIVETALKING_REPO_URL}")"
   if git -c http.version=HTTP/1.1 -C "${LIVETALKING_DIR}" \
-    fetch origin "${LIVETALKING_REF}"; then
+    fetch "${proxy_url}" "${LIVETALKING_REF}"; then
     return 0
   fi
 
-  proxy_url="$(github_proxy_url "${LIVETALKING_REPO_URL}")"
   [[ "${proxy_url}" != "${LIVETALKING_REPO_URL}" ]] || return 1
-  warn "Direct GitHub fetch failed; falling back to ${proxy_url}"
+  warn "GitHub proxy fetch failed; falling back to the direct repository"
   for attempt in 1 2 3; do
     if git -c http.version=HTTP/1.1 -C "${LIVETALKING_DIR}" \
-      fetch "${proxy_url}" "${LIVETALKING_REF}"; then
+      fetch "${LIVETALKING_REPO_URL}" "${LIVETALKING_REF}"; then
       return 0
     fi
     ((attempt < 3)) && sleep $((attempt * 5))
@@ -531,9 +531,9 @@ Environment=TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 Environment=TORCH_HOME=${TORCH_HOME}
 Environment=LIVETALKING_PCM_PREBUFFER_MS=200
 Environment=LIVETALKING_MOUTH_STABILIZER=1
-Environment=LIVETALKING_MOUTH_STRENGTH=0.22
-Environment=LIVETALKING_MOUTH_MOTION_THRESHOLD=0.12
-Environment=LIVETALKING_MOUTH_TRANSITION_FRAMES=3
+Environment=LIVETALKING_MOUTH_STRENGTH=0.25
+Environment=LIVETALKING_MOUTH_MOTION_THRESHOLD=0.15
+Environment=LIVETALKING_MOUTH_TRANSITION_FRAMES=4
 Environment=LIVETALKING_VIDEO_BITRATE_INITIAL=3000000
 Environment=LIVETALKING_VIDEO_BITRATE_MIN=1000000
 Environment=LIVETALKING_VIDEO_BITRATE_MAX=6000000
