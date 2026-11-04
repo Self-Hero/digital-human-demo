@@ -8,6 +8,7 @@ DATA_ROOT="${DATA_ROOT:-/data}"
 CONDA_ROOT="${CONDA_ROOT:-${DATA_ROOT}/miniconda3}"
 LIVEPORTRAIT_DIR="${LIVEPORTRAIT_DIR:-${DATA_ROOT}/LivePortrait}"
 CODEFORMER_DIR="${CODEFORMER_DIR:-${DATA_ROOT}/CodeFormer}"
+INSTALL_CODEFORMER="${INSTALL_CODEFORMER:-0}"
 LIVEPORTRAIT_REF="${LIVEPORTRAIT_REF:-9b294b3d0536135442ea73cb01e6cb3ca7029dd3}"
 CODEFORMER_REF="${CODEFORMER_REF:-b33cc7d639d6545bfcccc7e0bc6ae51f24e79c2b}"
 GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
@@ -94,31 +95,33 @@ HF_ENDPOINT="${HF_ENDPOINT}" HF_HUB_DISABLE_XET=1 \
   conda_run liveportrait python -c \
   "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', allow_patterns=['liveportrait/base_models/*', 'liveportrait/retargeting_models/*', 'liveportrait/landmark.onnx', 'insightface/models/buffalo_l/*'], max_workers=1)"
 
-log "Installing CodeFormer in a separate environment"
-clone_at_ref "https://github.com/sczhou/CodeFormer.git" \
-  "${CODEFORMER_DIR}" "${CODEFORMER_REF}"
-ensure_env codeformer
-conda_run codeformer python -m pip install --upgrade pip \
-  --index-url "${PIP_INDEX_URL}"
-install_torch_prerequisites codeformer
-conda_run codeformer python -m pip install \
-  torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
-  --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
-conda_run codeformer python -m pip install \
-  --index-url "${PIP_INDEX_URL}" \
-  -r "${PROJECT_DIR}/deploy/codeformer-inference-requirements.txt"
-cp "${PROJECT_DIR}/deploy/codeformer_basicsr_version.py" \
-  "${CODEFORMER_DIR}/basicsr/version.py"
+if [[ "${INSTALL_CODEFORMER}" == 1 ]]; then
+  log "Installing optional CodeFormer environment"
+  clone_at_ref "https://github.com/sczhou/CodeFormer.git" \
+    "${CODEFORMER_DIR}" "${CODEFORMER_REF}"
+  ensure_env codeformer
+  conda_run codeformer python -m pip install --upgrade pip \
+    --index-url "${PIP_INDEX_URL}"
+  install_torch_prerequisites codeformer
+  conda_run codeformer python -m pip install \
+    torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
+    --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
+  conda_run codeformer python -m pip install \
+    --index-url "${PIP_INDEX_URL}" \
+    -r "${PROJECT_DIR}/deploy/codeformer-inference-requirements.txt"
+  cp "${PROJECT_DIR}/deploy/codeformer_basicsr_version.py" \
+    "${CODEFORMER_DIR}/basicsr/version.py"
 
-download_release_file \
-  "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth" \
-  "${CODEFORMER_DIR}/weights/CodeFormer/codeformer.pth"
-download_release_file \
-  "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/detection_Resnet50_Final.pth" \
-  "${CODEFORMER_DIR}/weights/facelib/detection_Resnet50_Final.pth"
-download_release_file \
-  "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/parsing_parsenet.pth" \
-  "${CODEFORMER_DIR}/weights/facelib/parsing_parsenet.pth"
+  download_release_file \
+    "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth" \
+    "${CODEFORMER_DIR}/weights/CodeFormer/codeformer.pth"
+  download_release_file \
+    "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/detection_Resnet50_Final.pth" \
+    "${CODEFORMER_DIR}/weights/facelib/detection_Resnet50_Final.pth"
+  download_release_file \
+    "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/parsing_parsenet.pth" \
+    "${CODEFORMER_DIR}/weights/facelib/parsing_parsenet.pth"
+fi
 
 log "Verifying the installation"
 for model_file in \
@@ -133,14 +136,20 @@ for model_file in \
   test -s "${LIVEPORTRAIT_DIR}/pretrained_weights/${model_file}" || \
     die "Missing LivePortrait model: ${model_file}"
 done
-test -s "${CODEFORMER_DIR}/weights/CodeFormer/codeformer.pth"
 conda_run liveportrait python -c "import torch, cv2, onnxruntime; assert torch.cuda.is_available(); print('LivePortrait CUDA:', torch.cuda.get_device_name(0))"
-(
-  cd "${CODEFORMER_DIR}"
-  conda_run codeformer python -c "import torch, cv2, basicsr; from facelib.utils.face_restoration_helper import FaceRestoreHelper; assert torch.cuda.is_available(); print('CodeFormer CUDA:', torch.cuda.get_device_name(0))"
-)
+if [[ "${INSTALL_CODEFORMER}" == 1 ]]; then
+  test -s "${CODEFORMER_DIR}/weights/CodeFormer/codeformer.pth"
+  (
+    cd "${CODEFORMER_DIR}"
+    conda_run codeformer python -c "import torch, cv2, basicsr; from facelib.utils.face_restoration_helper import FaceRestoreHelper; assert torch.cuda.is_available(); print('CodeFormer CUDA:', torch.cuda.get_device_name(0))"
+  )
+fi
 
 echo
 echo "Installation completed. No service was changed or restarted."
 echo "LivePortrait: ${LIVEPORTRAIT_DIR}"
-echo "CodeFormer:   ${CODEFORMER_DIR}"
+if [[ "${INSTALL_CODEFORMER}" == 1 ]]; then
+  echo "CodeFormer:   ${CODEFORMER_DIR}"
+else
+  echo "CodeFormer:   skipped (set INSTALL_CODEFORMER=1 to install it)"
+fi

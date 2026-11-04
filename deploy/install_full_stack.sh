@@ -16,9 +16,11 @@ usage() {
   cat <<'EOF'
 Usage: bash deploy/install_full_stack.sh OPTIONS
 
-Installs the application, LiveTalking, MuseTalk, LivePortrait, CodeFormer,
+Installs the application, LiveTalking, MuseTalk and LivePortrait,
 Nginx and systemd services. If an avatar source is supplied, it also
 preprocesses that avatar and starts its LiveTalking instance.
+
+CodeFormer is intentionally excluded from the default real-time stack.
 
 Options:
   --public-ip IP          Public IPv4 used by the frontend (required)
@@ -82,7 +84,7 @@ fi
 echo "[1/3] Installing the digital-human application, LiveTalking and MuseTalk"
 bash "${PROJECT_DIR}/deploy/bootstrap_server.sh" "${bootstrap_args[@]}"
 
-echo "[2/3] Installing LivePortrait and CodeFormer"
+echo "[2/3] Installing LivePortrait (CodeFormer is optional and skipped)"
 bash "${PROJECT_DIR}/deploy/install_face_pipeline.sh"
 
 if [[ -n "${AVATAR_SOURCE}" ]]; then

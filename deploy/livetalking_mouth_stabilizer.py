@@ -1,4 +1,4 @@
-"""Lightweight temporal stabilization for MuseTalk's generated mouth region."""
+"""Local mouth compositing and temporal stabilization for MuseTalk."""
 
 from __future__ import annotations
 
@@ -34,6 +34,18 @@ class MouthTemporalStabilizer:
 
     def __init__(self) -> None:
         self.enabled = _env_enabled("LIVETALKING_MOUTH_STABILIZER", "0")
+        self.local_compositor = _env_enabled(
+            "LIVETALKING_MOUTH_LOCAL_COMPOSITOR", "1"
+        )
+        self.color_match_strength = _env_float(
+            "LIVETALKING_MOUTH_COLOR_MATCH", 0.35, 0.0, 1.0
+        )
+        self.sharpen_strength = _env_float(
+            "LIVETALKING_MOUTH_SHARPEN", 0.18, 0.0, 0.6
+        )
+        self.optical_flow = _env_enabled(
+            "LIVETALKING_MOUTH_OPTICAL_FLOW", "0"
+        )
         self.strength = _env_float(
             "LIVETALKING_MOUTH_STRENGTH", 0.22, 0.0, 0.35
         )
@@ -50,10 +62,16 @@ class MouthTemporalStabilizer:
         self._last_frame_at = 0.0
         self._transition_index = 0
         self._mask_cache: dict[tuple[int, int], np.ndarray] = {}
+        self._face_mask_cache: dict[tuple[int, int], np.ndarray] = {}
         logger.info(
-            "MuseTalk mouth stabilizer: enabled=%s strength=%.3f "
-            "threshold=%.3f transition_frames=%d",
+            "MuseTalk mouth compositor: local=%s color_match=%.3f "
+            "sharpen=%.3f temporal=%s optical_flow=%s strength=%.3f threshold=%.3f "
+            "transition_frames=%d",
+            self.local_compositor,
+            self.color_match_strength,
+            self.sharpen_strength,
             self.enabled,
+            self.optical_flow,
             self.strength,
             self.motion_threshold,
             self.transition_frames,
@@ -70,6 +88,9 @@ class MouthTemporalStabilizer:
         bbox,
         reference_frame: np.ndarray | None = None,
     ) -> np.ndarray:
+        if self.local_compositor and reference_frame is not None:
+            frame = self._composite_local_mouth(frame, reference_frame, bbox)
+
         if not self.enabled or self.strength <= 0:
             return frame
 
@@ -100,7 +121,11 @@ class MouthTemporalStabilizer:
             (current.shape[1], current.shape[0]),
             interpolation=cv2.INTER_LINEAR,
         )
-        aligned_previous = self._align_previous(previous, current)
+        aligned_previous = (
+            self._align_previous(previous, current)
+            if self.optical_flow
+            else previous
+        )
         current_gray = cv2.cvtColor(current, cv2.COLOR_BGR2GRAY)
         previous_gray = cv2.cvtColor(aligned_previous, cv2.COLOR_BGR2GRAY)
         motion = float(
@@ -136,6 +161,80 @@ class MouthTemporalStabilizer:
         frame[y1:y2, x1:x2] = result
         self._previous = result
         return frame
+
+    def _composite_local_mouth(
+        self,
+        generated_frame: np.ndarray,
+        reference_frame: np.ndarray,
+        bbox,
+    ) -> np.ndarray:
+        """Keep the source face intact outside a feathered lower-mouth mask."""
+        face_box = self._clip_face_box(generated_frame.shape, bbox)
+        if face_box is None or reference_frame.shape != generated_frame.shape:
+            return generated_frame
+
+        x1, y1, x2, y2 = face_box
+        generated = generated_frame[y1:y2, x1:x2]
+        reference = reference_frame[y1:y2, x1:x2]
+        if generated.size == 0:
+            return generated_frame
+
+        mask = self._local_face_mask(generated.shape[0], generated.shape[1])
+        processed = self._match_boundary_color(generated, reference, mask)
+        if self.sharpen_strength > 0:
+            blurred = cv2.GaussianBlur(processed, (0, 0), 0.8)
+            processed = cv2.addWeighted(
+                processed,
+                1.0 + self.sharpen_strength,
+                blurred,
+                -self.sharpen_strength,
+                0.0,
+            )
+
+        mask_2d = mask[..., 0]
+        generated_frame[y1:y2, x1:x2] = cv2.blendLinear(
+            processed,
+            reference,
+            mask_2d,
+            1.0 - mask_2d,
+        )
+        return generated_frame
+
+    def _match_boundary_color(
+        self,
+        generated: np.ndarray,
+        reference: np.ndarray,
+        mask: np.ndarray,
+    ) -> np.ndarray:
+        if self.color_match_strength <= 0:
+            return generated
+
+        height, width = mask.shape[:2]
+        yy, xx = np.ogrid[:height, :width]
+        # Sample skin around the lips and exclude the central mouth itself.
+        central_mouth = (
+            (xx >= width * 0.30)
+            & (xx <= width * 0.70)
+            & (yy >= height * 0.58)
+            & (yy <= height * 0.86)
+        )
+        # A sparse skin sample is sufficient for a bounded color offset and
+        # avoids scanning the full face ROI on every video frame.
+        sample = ((mask[..., 0] > 0.18) & ~central_mouth)[::4, ::4]
+        if int(np.count_nonzero(sample)) < 32:
+            return generated
+
+        sampled_reference = reference[::4, ::4][sample].astype(np.int16)
+        sampled_generated = generated[::4, ::4][sample].astype(np.int16)
+        offset = np.median(sampled_reference - sampled_generated, axis=0)
+        offset = np.clip(offset, -12.0, 12.0) * self.color_match_strength
+        if float(np.max(np.abs(offset))) < 0.5:
+            return generated
+        return np.clip(
+            generated.astype(np.float32) + offset.reshape(1, 1, 3),
+            0,
+            255,
+        ).astype(np.uint8)
 
     def _blend_entry(
         self,
@@ -188,13 +287,23 @@ class MouthTemporalStabilizer:
         if face_width < 16 or face_height < 16:
             return None
 
-        mouth_x1 = max(0, x1 + int(face_width * 0.23))
-        mouth_x2 = min(width, x1 + int(face_width * 0.77))
-        mouth_y1 = max(0, y1 + int(face_height * 0.58))
-        mouth_y2 = min(height, y1 + int(face_height * 0.94))
+        mouth_x1 = max(0, x1 + int(face_width * 0.18))
+        mouth_x2 = min(width, x1 + int(face_width * 0.82))
+        mouth_y1 = max(0, y1 + int(face_height * 0.50))
+        mouth_y2 = min(height, y1 + int(face_height * 0.98))
         if mouth_x2 - mouth_x1 < 8 or mouth_y2 - mouth_y1 < 8:
             return None
         return mouth_x1, mouth_y1, mouth_x2, mouth_y2
+
+    @staticmethod
+    def _clip_face_box(frame_shape, bbox) -> tuple[int, int, int, int] | None:
+        height, width = frame_shape[:2]
+        x1, y1, x2, y2 = (int(value) for value in bbox)
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(width, x2), min(height, y2)
+        if x2 - x1 < 16 or y2 - y1 < 16:
+            return None
+        return x1, y1, x2, y2
 
     @staticmethod
     def _align_previous(previous: np.ndarray, current: np.ndarray) -> np.ndarray:
@@ -247,4 +356,26 @@ class MouthTemporalStabilizer:
         mask = cv2.GaussianBlur(mask, (blur_size, blur_size), 0)
         mask = mask[..., None]
         self._mask_cache[key] = mask
+        return mask
+
+    def _local_face_mask(self, height: int, width: int) -> np.ndarray:
+        key = (height, width)
+        cached = self._face_mask_cache.get(key)
+        if cached is not None:
+            return cached
+
+        mask = np.zeros((height, width), dtype=np.float32)
+        cv2.ellipse(
+            mask,
+            (width // 2, int(height * 0.72)),
+            (max(1, int(width * 0.38)), max(1, int(height * 0.27))),
+            0,
+            0,
+            360,
+            1.0,
+            -1,
+        )
+        sigma = max(1.0, min(height, width) * 0.035)
+        mask = cv2.GaussianBlur(mask, (0, 0), sigma)[..., None]
+        self._face_mask_cache[key] = mask
         return mask
