@@ -53,6 +53,14 @@ conda_run() {
   "${CONDA_BIN}" run --no-capture-output -n "${environment}" "$@"
 }
 
+install_torch_prerequisites() {
+  local environment="$1"
+  conda_run "${environment}" python -m pip install \
+    --index-url "${PIP_INDEX_URL}" \
+    numpy==1.26.4 pillow==10.4.0 filelock typing-extensions \
+    sympy networkx jinja2 fsspec
+}
+
 download_release_file() {
   local url="$1" destination="$2" temporary="${destination}.part"
   [[ -s "${destination}" ]] && return 0
@@ -70,6 +78,7 @@ clone_at_ref "https://github.com/KwaiVGI/LivePortrait.git" \
 ensure_env liveportrait
 conda_run liveportrait python -m pip install --upgrade pip \
   --index-url "${PIP_INDEX_URL}"
+install_torch_prerequisites liveportrait
 conda_run liveportrait python -m pip install \
   torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
   --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
@@ -85,6 +94,7 @@ clone_at_ref "https://github.com/sczhou/CodeFormer.git" \
 ensure_env codeformer
 conda_run codeformer python -m pip install --upgrade pip \
   --index-url "${PIP_INDEX_URL}"
+install_torch_prerequisites codeformer
 conda_run codeformer python -m pip install \
   torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
   --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
