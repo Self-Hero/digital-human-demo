@@ -84,7 +84,7 @@ conda_run liveportrait python -m pip install \
   --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
 conda_run liveportrait python -m pip install \
   --index-url "${PIP_INDEX_URL}" -r "${LIVEPORTRAIT_DIR}/requirements.txt" \
-  "huggingface_hub[cli]"
+  "huggingface_hub[cli]==0.25.2"
 HF_ENDPOINT="${HF_ENDPOINT}" conda_run liveportrait python -c \
   "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', ignore_patterns=['*.git*', 'README.md', 'docs/*'])"
 
