@@ -86,8 +86,10 @@ conda_run liveportrait python -m pip install \
   --index-url "${PIP_INDEX_URL}" -r "${LIVEPORTRAIT_DIR}/requirements.txt" \
   "huggingface_hub[cli]==0.25.2" \
   albucore==0.0.12 opencv-python-headless==4.10.0.84
-HF_ENDPOINT="${HF_ENDPOINT}" conda_run liveportrait python -c \
-  "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', ignore_patterns=['*.git*', 'README.md', 'docs/*'])"
+HF_ENDPOINT="${HF_ENDPOINT}" HF_HUB_DISABLE_XET=1 \
+  HF_HUB_DOWNLOAD_TIMEOUT=600 HF_HUB_ETAG_TIMEOUT=60 \
+  conda_run liveportrait python -c \
+  "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', ignore_patterns=['*.git*', 'README.md', 'docs/*'], max_workers=1)"
 
 log "Installing CodeFormer in a separate environment"
 clone_at_ref "https://github.com/sczhou/CodeFormer.git" \
