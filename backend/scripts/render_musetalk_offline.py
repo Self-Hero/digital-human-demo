@@ -44,6 +44,71 @@ def mirror_index(length: int, index: int) -> int:
     return position if position < length else period - position
 
 
+def blend_face_clipped(
+    image: np.ndarray,
+    face: np.ndarray,
+    face_box,
+    mask_array: np.ndarray,
+    crop_box,
+) -> np.ndarray:
+    """Blend a generated face when preprocessing boxes cross frame edges."""
+    height, width = image.shape[:2]
+    face_x1, face_y1, face_x2, face_y2 = (int(value) for value in face_box)
+    crop_x1, crop_y1, crop_x2, crop_y2 = (int(value) for value in crop_box)
+    crop_width = crop_x2 - crop_x1
+    crop_height = crop_y2 - crop_y1
+    if crop_width <= 0 or crop_height <= 0:
+        return image
+
+    clipped_crop_x1 = max(0, crop_x1)
+    clipped_crop_y1 = max(0, crop_y1)
+    clipped_crop_x2 = min(width, crop_x2)
+    clipped_crop_y2 = min(height, crop_y2)
+    if clipped_crop_x1 >= clipped_crop_x2 or clipped_crop_y1 >= clipped_crop_y2:
+        return image
+
+    if mask_array.shape[:2] != (crop_height, crop_width):
+        mask_array = cv2.resize(mask_array, (crop_width, crop_height))
+    mask_x1 = clipped_crop_x1 - crop_x1
+    mask_y1 = clipped_crop_y1 - crop_y1
+    mask_x2 = mask_x1 + clipped_crop_x2 - clipped_crop_x1
+    mask_y2 = mask_y1 + clipped_crop_y2 - clipped_crop_y1
+    clipped_mask = mask_array[mask_y1:mask_y2, mask_x1:mask_x2]
+
+    region = image[
+        clipped_crop_y1:clipped_crop_y2,
+        clipped_crop_x1:clipped_crop_x2,
+    ].copy()
+    insert_x1 = max(clipped_crop_x1, face_x1)
+    insert_y1 = max(clipped_crop_y1, face_y1)
+    insert_x2 = min(clipped_crop_x2, face_x2)
+    insert_y2 = min(clipped_crop_y2, face_y2)
+    if insert_x1 < insert_x2 and insert_y1 < insert_y2:
+        source_x1 = insert_x1 - face_x1
+        source_y1 = insert_y1 - face_y1
+        source_x2 = source_x1 + insert_x2 - insert_x1
+        source_y2 = source_y1 + insert_y2 - insert_y1
+        region[
+            insert_y1 - clipped_crop_y1:insert_y2 - clipped_crop_y1,
+            insert_x1 - clipped_crop_x1:insert_x2 - clipped_crop_x1,
+        ] = face[source_y1:source_y2, source_x1:source_x2]
+
+    if clipped_mask.ndim == 3:
+        clipped_mask = cv2.cvtColor(clipped_mask, cv2.COLOR_BGR2GRAY)
+    weights = clipped_mask.astype(np.float32) / 255.0
+    if weights.shape != region.shape[:2]:
+        weights = cv2.resize(weights, (region.shape[1], region.shape[0]))
+    background = image[
+        clipped_crop_y1:clipped_crop_y2,
+        clipped_crop_x1:clipped_crop_x2,
+    ]
+    image[
+        clipped_crop_y1:clipped_crop_y2,
+        clipped_crop_x1:clipped_crop_x2,
+    ] = cv2.blendLinear(region, background, weights, 1.0 - weights)
+    return image
+
+
 def main() -> None:
     args = parse_args()
     root = args.livetalking_dir.expanduser().resolve()
@@ -67,7 +132,6 @@ def main() -> None:
     os.chdir(root)
     sys.path.insert(0, str(root))
     from avatars.mouth_stabilizer import MouthTemporalStabilizer
-    from avatars.musetalk.myutil import get_image_blending
     from avatars.musetalk_avatar import load_model
 
     audio, sample_rate = sf.read(str(audio_path), dtype="float32", always_2d=False)
@@ -144,7 +208,7 @@ def main() -> None:
                     generated[offset].astype(np.uint8),
                     (x2 - x1, y2 - y1),
                 )
-                combined = get_image_blending(
+                combined = blend_face_clipped(
                     original,
                     face,
                     coords[index],
