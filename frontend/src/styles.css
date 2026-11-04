@@ -207,6 +207,24 @@ h2 {
   background: #2081d8;
 }
 
+.audio-unlock-button {
+  position: absolute;
+  z-index: 4;
+  right: 16px;
+  bottom: 16px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #78ddb9;
+  border-radius: 7px;
+  color: #07130f;
+  background: #78ddb9;
+  font-weight: 700;
+}
+
+.audio-unlock-button:hover {
+  background: #9be8cd;
+}
+
 .avatar-session {
   color: #78ddb9;
   font-size: 0.84rem;

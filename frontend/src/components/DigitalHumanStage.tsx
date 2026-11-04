@@ -31,6 +31,7 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [mediaAspectRatio, setMediaAspectRatio] = useState(9 / 16);
+  const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
   const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE;
 
   const updateAspectRatio = (width: number, height: number) => {
@@ -42,8 +43,27 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   }, [avatar.videoStream]);
 
   useEffect(() => {
-    if (audioRef.current) audioRef.current.srcObject = avatar.audioStream;
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.srcObject = avatar.audioStream;
+    if (!avatar.audioStream) {
+      setAudioPlaybackBlocked(false);
+      return;
+    }
+    void audio
+      .play()
+      .then(() => setAudioPlaybackBlocked(false))
+      .catch(() => setAudioPlaybackBlocked(true));
   }, [avatar.audioStream]);
+
+  const resumeAudioPlayback = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    void audio
+      .play()
+      .then(() => setAudioPlaybackBlocked(false))
+      .catch(() => setAudioPlaybackBlocked(true));
+  };
 
   const stageStyle = {
     "--avatar-aspect-ratio": mediaAspectRatio,
@@ -90,6 +110,15 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
           />
         )}
         <audio ref={audioRef} autoPlay />
+        {audioPlaybackBlocked && avatar.connectionState === "connected" && (
+          <button
+            className="audio-unlock-button"
+            type="button"
+            onClick={resumeAudioPlayback}
+          >
+            开启声音
+          </button>
+        )}
         {avatar.connectionState !== "connected" && (
           <div className="avatar-connect-panel">
             <p>{avatar.error ?? "数字人视频尚未连接"}</p>
