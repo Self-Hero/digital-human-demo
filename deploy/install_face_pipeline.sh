@@ -12,6 +12,7 @@ GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 PYTORCH_INDEX_URL="${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}"
+CONDA_CHANNEL="${CONDA_CHANNEL:-https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge}"
 CONDA_BIN="${CONDA_ROOT}/bin/conda"
 
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
@@ -26,13 +27,14 @@ nvidia-smi >/dev/null || die "NVIDIA GPU or driver is unavailable."
 
 clone_at_ref() {
   local repository="$1" directory="$2" ref="$3" proxy_url
+  proxy_url="${GITHUB_PROXY_PREFIX%/}/${repository}"
   if [[ ! -d "${directory}/.git" ]]; then
-    if ! git -c http.version=HTTP/1.1 clone --filter=blob:none "${repository}" "${directory}"; then
+    if ! git -c http.version=HTTP/1.1 clone --filter=blob:none "${proxy_url}" "${directory}"; then
       [[ ! -e "${directory}" ]] || mv "${directory}" "${directory}.failed-$(date '+%Y%m%d-%H%M%S')"
-      proxy_url="${GITHUB_PROXY_PREFIX%/}/${repository}"
-      git -c http.version=HTTP/1.1 clone --filter=blob:none "${proxy_url}" "${directory}"
+      git -c http.version=HTTP/1.1 clone --filter=blob:none "${repository}" "${directory}"
     fi
   fi
+  git -C "${directory}" remote set-url origin "${proxy_url}"
   git -C "${directory}" fetch --depth=1 origin "${ref}"
   git -C "${directory}" checkout --detach "${ref}"
 }
@@ -40,7 +42,8 @@ clone_at_ref() {
 ensure_env() {
   local environment="$1"
   if [[ ! -d "${CONDA_ROOT}/envs/${environment}" ]]; then
-    "${CONDA_BIN}" create -y -n "${environment}" python=3.10 pip
+    "${CONDA_BIN}" create -y -n "${environment}" \
+      --override-channels --channel "${CONDA_CHANNEL}" python=3.10 pip
   fi
 }
 
@@ -54,9 +57,9 @@ download_release_file() {
   local url="$1" destination="$2" temporary="${destination}.part"
   [[ -s "${destination}" ]] && return 0
   mkdir -p "$(dirname "${destination}")"
-  if ! curl -fL --retry 5 --retry-delay 3 -o "${temporary}" "${url}"; then
-    curl -fL --retry 5 --retry-delay 3 -o "${temporary}" \
-      "${GITHUB_PROXY_PREFIX%/}/${url}"
+  if ! curl -fL --retry 5 --retry-delay 3 -o "${temporary}" \
+      "${GITHUB_PROXY_PREFIX%/}/${url}"; then
+    curl -fL --retry 5 --retry-delay 3 -o "${temporary}" "${url}"
   fi
   mv "${temporary}" "${destination}"
 }
