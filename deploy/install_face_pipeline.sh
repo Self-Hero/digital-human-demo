@@ -68,7 +68,8 @@ log "Installing LivePortrait in an isolated environment"
 clone_at_ref "https://github.com/KwaiVGI/LivePortrait.git" \
   "${LIVEPORTRAIT_DIR}" "${LIVEPORTRAIT_REF}"
 ensure_env liveportrait
-conda_run liveportrait python -m pip install --upgrade pip
+conda_run liveportrait python -m pip install --upgrade pip \
+  --index-url "${PIP_INDEX_URL}"
 conda_run liveportrait python -m pip install \
   torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
   --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
@@ -82,7 +83,8 @@ log "Installing CodeFormer in a separate environment"
 clone_at_ref "https://github.com/sczhou/CodeFormer.git" \
   "${CODEFORMER_DIR}" "${CODEFORMER_REF}"
 ensure_env codeformer
-conda_run codeformer python -m pip install --upgrade pip
+conda_run codeformer python -m pip install --upgrade pip \
+  --index-url "${PIP_INDEX_URL}"
 conda_run codeformer python -m pip install \
   torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
   --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
