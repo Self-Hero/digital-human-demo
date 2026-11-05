@@ -15,6 +15,8 @@ import numpy as np
 import soundfile as sf
 import torch
 
+from musetalk_audio_windows import plan_whisper_windows
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -42,6 +44,31 @@ def mirror_index(length: int, index: int) -> int:
     period = max(1, 2 * length - 2)
     position = index % period
     return position if position < length else period - position
+
+
+def extract_audio_features(audio_processor, audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    """Extract Whisper features without truncating audio longer than 30 seconds."""
+    windows = plan_whisper_windows(len(audio), sample_rate)
+    if len(windows) == 1:
+        return audio_processor.audio2feat(audio)
+
+    feature_chunks = []
+    for window in windows:
+        chunk = audio[window.start:window.stop]
+        features = audio_processor.audio2feat(chunk)
+        features = features[:window.valid_features]
+        if window.discard_features:
+            features = features[window.discard_features:]
+        feature_chunks.append(features)
+
+    combined = np.concatenate(feature_chunks, axis=0)
+    expected = math.ceil(len(audio) / sample_rate * 50)
+    if len(combined) < expected:
+        raise RuntimeError(
+            f"Whisper feature extraction returned {len(combined)} frames; "
+            f"expected at least {expected}"
+        )
+    return combined[:expected]
 
 
 def blend_face_clipped(
@@ -153,7 +180,7 @@ def main() -> None:
         raise RuntimeError("Avatar assets have inconsistent frame counts")
 
     vae, unet, pe, timesteps, audio_processor = load_model()
-    audio_features = audio_processor.audio2feat(audio)
+    audio_features = extract_audio_features(audio_processor, audio, sample_rate)
     chunks = [
         audio_processor.get_sliced_feature(audio_features, index, fps=args.fps)[0]
         for index in range(frame_count)
