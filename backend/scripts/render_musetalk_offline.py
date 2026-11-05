@@ -64,9 +64,14 @@ def extract_audio_features(audio_processor, audio: np.ndarray, sample_rate: int)
     combined = np.concatenate(feature_chunks, axis=0)
     expected = math.ceil(len(audio) / sample_rate * 50)
     if len(combined) < expected:
-        raise RuntimeError(
-            f"Whisper feature extraction returned {len(combined)} frames; "
-            f"expected at least {expected}"
+        missing = expected - len(combined)
+        if missing > len(windows):
+            raise RuntimeError(
+                f"Whisper feature extraction returned {len(combined)} frames; "
+                f"expected at least {expected}"
+            )
+        combined = np.concatenate(
+            [combined, np.repeat(combined[-1:], missing, axis=0)], axis=0
         )
     return combined[:expected]
 
