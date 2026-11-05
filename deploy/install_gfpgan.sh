@@ -29,14 +29,24 @@ conda_run() {
 
 log "Installing GFPGAN source"
 proxy_url="${GITHUB_PROXY_PREFIX%/}/https://github.com/TencentARC/GFPGAN.git"
+repository_url="https://github.com/TencentARC/GFPGAN.git"
 if [[ ! -d "${GFPGAN_DIR}/.git" ]]; then
-  git -c http.version=HTTP/1.1 clone "${proxy_url}" "${GFPGAN_DIR}" || \
-    git -c http.version=HTTP/1.1 clone \
-      https://github.com/TencentARC/GFPGAN.git "${GFPGAN_DIR}"
+  if git -c http.version=HTTP/1.1 clone "${proxy_url}" "${GFPGAN_DIR}"; then
+    fetch_url="${proxy_url}"
+  else
+    git -c http.version=HTTP/1.1 clone "${repository_url}" "${GFPGAN_DIR}"
+    fetch_url="${repository_url}"
+  fi
+else
+  fetch_url="${proxy_url}"
 fi
-git -C "${GFPGAN_DIR}" remote set-url origin "${proxy_url}"
 if [[ -z "$(git -C "${GFPGAN_DIR}" status --porcelain --untracked-files=no)" ]]; then
-  git -C "${GFPGAN_DIR}" fetch --depth=1 origin "${GFPGAN_REF}"
+  if ! git -C "${GFPGAN_DIR}" fetch --depth=1 \
+      "${fetch_url}" "${GFPGAN_REF}"; then
+    [[ "${fetch_url}" != "${proxy_url}" ]] || \
+      git -C "${GFPGAN_DIR}" fetch --depth=1 \
+        "${repository_url}" "${GFPGAN_REF}"
+  fi
   git -C "${GFPGAN_DIR}" checkout --detach "${GFPGAN_REF}"
 else
   log "Keeping existing GFPGAN checkout because it has tracked changes"

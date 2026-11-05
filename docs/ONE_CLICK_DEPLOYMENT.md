@@ -1,7 +1,7 @@
 # 一键部署
 
-脚本目标是从干净的 Ubuntu 22.04 GPU 服务器部署当前项目，不修改 NVIDIA 驱动，也不把
-SoulX 与 MuseTalk 安装到同一个 Python 环境。
+脚本目标是从干净的 Ubuntu 22.04 GPU 服务器部署当前项目，不修改 NVIDIA 驱动。默认
+实时栈只包含 LiveTalking、MuseTalk 和可选 GFPGAN，不安装 SoulX、LivePortrait 或 CodeFormer。
 
 ## 前置条件
 
@@ -22,7 +22,8 @@ SoulX 与 MuseTalk 安装到同一个 Python 环境。
 ```bash
 git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-human-demo
 cd /data/digital-human-demo
-bash deploy/bootstrap_server.sh --public-ip 36.103.177.214 --public-port 9000
+bash deploy/install_full_stack.sh \
+  --public-ip 36.103.177.214 --public-port 9000
 ```
 
 换服务器时把 `--public-ip` 改为新机器公网 IP。当前云平台限制 `80/443/8080`，因此默认使用
@@ -41,7 +42,7 @@ Hugging Face 镜像和 npmmirror；PyTorch CUDA wheel 仍从 PyTorch 官方源�
 7. 下载 MuseTalk 1.5、SD VAE、Whisper Tiny、人脸解析权重并校验关键文件。
 8. 安装后端依赖、构建 React 前端并应用本项目维护的 LiveTalking 补丁。
 9. 安装 systemd 服务和 Nginx 反向代理。
-10. 执行 CUDA、Python、模型文件、Nginx 和后端健康检查。
+10. 安装默认关闭的 GFPGAN 实时运行时，并执行 CUDA、Python、模型文件、Nginx 和后端健康检查。
 
 只安装实时推理所需权重。MuseTalk 1.0、DWPose、SyncNet 属于旧版本、训练或评估路径，
 LiveTalking 的 MuseTalk 1.5 实时链路不会读取它们，因此不下载。
@@ -97,6 +98,15 @@ MuseTalk 已生成的批量人脸块，不运行逐帧人脸检测。默认使�
 ```bash
 bash deploy/install_gfpgan.sh
 ```
+
+CodeFormer 不属于实时栈，只有明确需要离线人脸修复时才单独安装：
+
+```bash
+INSTALL_CODEFORMER=1 bash deploy/install_face_pipeline.sh
+```
+
+该命令不会安装 LivePortrait。旧版离线闭嘴中和流程同时需要两者时，必须显式设置
+`INSTALL_LIVEPORTRAIT=1 INSTALL_CODEFORMER=1`；默认服务器部署不执行该流程。
 
 建议通过 systemd drop-in 为单个头像启用，而不是修改模板：
 

@@ -86,5 +86,5 @@ VITE_TURN_PASSWORD=<turn-password>
 /data/turn.env             可选 TURN 凭证，仅服务器可读
 ```
 
-SoulX 保持在 `/data/SoulX-FlashHead` 和独立的 `flashhead` Conda 环境中；LiveTalking
-使用独立环境，不能共用 Python 依赖。
+默认服务器不安装 SoulX-FlashHead 或 LivePortrait。LiveTalking/MuseTalk 使用独立的
+`livetalking` Conda 环境；可选 CodeFormer 使用自己的 `codeformer` 环境。

@@ -552,7 +552,7 @@ Environment=LIVETALKING_GFPGAN_BLEND=0.6
 Environment=LIVETALKING_VIDEO_BITRATE_INITIAL=3000000
 Environment=LIVETALKING_VIDEO_BITRATE_MIN=1000000
 Environment=LIVETALKING_VIDEO_BITRATE_MAX=6000000
-ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size 4 --fps 25 --listenport 8010 --stun ${STUN_URL}
+ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size 4 --max_session 1 --fps 25 --listenport 8010 --stun ${STUN_URL}
 Restart=on-failure
 RestartSec=5
 

@@ -16,11 +16,12 @@ usage() {
   cat <<'EOF'
 Usage: bash deploy/install_full_stack.sh OPTIONS
 
-Installs the application, LiveTalking, MuseTalk, LivePortrait and GFPGAN,
-Nginx and systemd services. If an avatar source is supplied, it also
-preprocesses that avatar and starts its LiveTalking instance.
+Installs the application, LiveTalking, MuseTalk and the optional realtime
+GFPGAN runtime, plus Nginx and systemd services. If an avatar source is
+supplied, it also preprocesses that avatar and starts its LiveTalking instance.
 
-CodeFormer is intentionally excluded from the default real-time stack.
+LivePortrait, SoulX-FlashHead and CodeFormer are intentionally excluded from
+the default real-time stack. CodeFormer has a separate explicit installer.
 
 Options:
   --public-ip IP          Public IPv4 used by the frontend (required)
@@ -65,8 +66,8 @@ if [[ -n "${AVATAR_SOURCE}" ]]; then
 fi
 [[ -d "${DATA_ROOT}" ]] || die "Data root is missing: ${DATA_ROOT}"
 available_kb="$(df -Pk "${DATA_ROOT}" | awk 'NR == 2 {print $4}')"
-((available_kb >= 50 * 1024 * 1024)) || \
-  die "Full-stack installation requires at least 50 GiB free under ${DATA_ROOT}"
+((available_kb >= 30 * 1024 * 1024)) || \
+  die "Full-stack installation requires at least 30 GiB free under ${DATA_ROOT}"
 
 export GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
@@ -81,21 +82,18 @@ if ((ENABLE_SILENCE_INFERENCE)); then
   bootstrap_args+=(--enable-silence-inference)
 fi
 
-echo "[1/4] Installing the digital-human application, LiveTalking and MuseTalk"
+echo "[1/3] Installing the digital-human application, LiveTalking and MuseTalk"
 bash "${PROJECT_DIR}/deploy/bootstrap_server.sh" "${bootstrap_args[@]}"
 
-echo "[2/4] Installing LivePortrait (CodeFormer is optional and skipped)"
-bash "${PROJECT_DIR}/deploy/install_face_pipeline.sh"
-
-echo "[3/4] Installing the optional realtime GFPGAN runtime (disabled by default)"
+echo "[2/3] Installing the optional realtime GFPGAN runtime (disabled by default)"
 bash "${PROJECT_DIR}/deploy/install_gfpgan.sh"
 
 if [[ -n "${AVATAR_SOURCE}" ]]; then
-  echo "[4/4] Preparing and starting avatar ${AVATAR_ID}"
+  echo "[3/3] Preparing and starting avatar ${AVATAR_ID}"
   bash "${PROJECT_DIR}/deploy/start_avatar.sh" \
     --avatar-source "${AVATAR_SOURCE}" --avatar-id "${AVATAR_ID}"
 else
-  echo "[4/4] Avatar preparation skipped because --avatar-source was not supplied"
+  echo "[3/3] Avatar preparation skipped because --avatar-source was not supplied"
 fi
 
 cat <<EOF

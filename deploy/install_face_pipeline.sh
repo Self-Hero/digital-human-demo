@@ -8,6 +8,7 @@ DATA_ROOT="${DATA_ROOT:-/data}"
 CONDA_ROOT="${CONDA_ROOT:-${DATA_ROOT}/miniconda3}"
 LIVEPORTRAIT_DIR="${LIVEPORTRAIT_DIR:-${DATA_ROOT}/LivePortrait}"
 CODEFORMER_DIR="${CODEFORMER_DIR:-${DATA_ROOT}/CodeFormer}"
+INSTALL_LIVEPORTRAIT="${INSTALL_LIVEPORTRAIT:-0}"
 INSTALL_CODEFORMER="${INSTALL_CODEFORMER:-0}"
 LIVEPORTRAIT_REF="${LIVEPORTRAIT_REF:-9b294b3d0536135442ea73cb01e6cb3ca7029dd3}"
 CODEFORMER_REF="${CODEFORMER_REF:-b33cc7d639d6545bfcccc7e0bc6ae51f24e79c2b}"
@@ -27,18 +28,33 @@ for command in git ffmpeg curl nvidia-smi; do
   command -v "${command}" >/dev/null || die "Missing command: ${command}"
 done
 nvidia-smi >/dev/null || die "NVIDIA GPU or driver is unavailable."
+[[ "${INSTALL_LIVEPORTRAIT}" == 0 || "${INSTALL_LIVEPORTRAIT}" == 1 ]] || \
+  die "INSTALL_LIVEPORTRAIT must be 0 or 1."
+[[ "${INSTALL_CODEFORMER}" == 0 || "${INSTALL_CODEFORMER}" == 1 ]] || \
+  die "INSTALL_CODEFORMER must be 0 or 1."
+if [[ "${INSTALL_LIVEPORTRAIT}" == 0 && "${INSTALL_CODEFORMER}" == 0 ]]; then
+  die "Nothing selected. Set INSTALL_CODEFORMER=1 and/or INSTALL_LIVEPORTRAIT=1."
+fi
 
 clone_at_ref() {
-  local repository="$1" directory="$2" ref="$3" proxy_url
+  local repository="$1" directory="$2" ref="$3" proxy_url active_url
   proxy_url="${GITHUB_PROXY_PREFIX%/}/${repository}"
   if [[ ! -d "${directory}/.git" ]]; then
-    if ! git -c http.version=HTTP/1.1 clone --filter=blob:none "${proxy_url}" "${directory}"; then
+    if git -c http.version=HTTP/1.1 clone --filter=blob:none \
+        "${proxy_url}" "${directory}"; then
+      active_url="${proxy_url}"
+    else
       [[ ! -e "${directory}" ]] || mv "${directory}" "${directory}.failed-$(date '+%Y%m%d-%H%M%S')"
       git -c http.version=HTTP/1.1 clone --filter=blob:none "${repository}" "${directory}"
+      active_url="${repository}"
     fi
+  else
+    active_url="${proxy_url}"
   fi
-  git -C "${directory}" remote set-url origin "${proxy_url}"
-  git -C "${directory}" fetch --depth=1 origin "${ref}"
+  if ! git -C "${directory}" fetch --depth=1 "${active_url}" "${ref}"; then
+    [[ "${active_url}" != "${proxy_url}" ]] || \
+      git -C "${directory}" fetch --depth=1 "${repository}" "${ref}"
+  fi
   git -C "${directory}" checkout --detach "${ref}"
 }
 
@@ -76,24 +92,26 @@ download_release_file() {
   mv "${temporary}" "${destination}"
 }
 
-log "Installing LivePortrait in an isolated environment"
-clone_at_ref "https://github.com/KwaiVGI/LivePortrait.git" \
-  "${LIVEPORTRAIT_DIR}" "${LIVEPORTRAIT_REF}"
-ensure_env liveportrait
-conda_run liveportrait python -m pip install --upgrade pip \
-  --index-url "${PIP_INDEX_URL}"
-install_torch_prerequisites liveportrait
-conda_run liveportrait python -m pip install \
-  torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
-  --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
-conda_run liveportrait python -m pip install \
-  --index-url "${PIP_INDEX_URL}" -r "${LIVEPORTRAIT_DIR}/requirements.txt" \
-  "huggingface_hub[cli]==0.25.2" \
-  albucore==0.0.12 opencv-python-headless==4.10.0.84
-HF_ENDPOINT="${HF_ENDPOINT}" HF_HUB_DISABLE_XET=1 \
-  HF_HUB_DOWNLOAD_TIMEOUT=600 HF_HUB_ETAG_TIMEOUT=60 \
-  conda_run liveportrait python -c \
-  "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', allow_patterns=['liveportrait/base_models/*', 'liveportrait/retargeting_models/*', 'liveportrait/landmark.onnx', 'insightface/models/buffalo_l/*'], max_workers=1)"
+if [[ "${INSTALL_LIVEPORTRAIT}" == 1 ]]; then
+  log "Installing LivePortrait in an isolated environment"
+  clone_at_ref "https://github.com/KwaiVGI/LivePortrait.git" \
+    "${LIVEPORTRAIT_DIR}" "${LIVEPORTRAIT_REF}"
+  ensure_env liveportrait
+  conda_run liveportrait python -m pip install --upgrade pip \
+    --index-url "${PIP_INDEX_URL}"
+  install_torch_prerequisites liveportrait
+  conda_run liveportrait python -m pip install \
+    torch==2.3.0+cu121 torchvision==0.18.0+cu121 torchaudio==2.3.0+cu121 \
+    --index-url "${PIP_INDEX_URL}" --extra-index-url "${PYTORCH_INDEX_URL}"
+  conda_run liveportrait python -m pip install \
+    --index-url "${PIP_INDEX_URL}" -r "${LIVEPORTRAIT_DIR}/requirements.txt" \
+    "huggingface_hub[cli]==0.25.2" \
+    albucore==0.0.12 opencv-python-headless==4.10.0.84
+  HF_ENDPOINT="${HF_ENDPOINT}" HF_HUB_DISABLE_XET=1 \
+    HF_HUB_DOWNLOAD_TIMEOUT=600 HF_HUB_ETAG_TIMEOUT=60 \
+    conda_run liveportrait python -c \
+    "from huggingface_hub import snapshot_download; snapshot_download('KlingTeam/LivePortrait', local_dir='${LIVEPORTRAIT_DIR}/pretrained_weights', allow_patterns=['liveportrait/base_models/*', 'liveportrait/retargeting_models/*', 'liveportrait/landmark.onnx', 'insightface/models/buffalo_l/*'], max_workers=1)"
+fi
 
 if [[ "${INSTALL_CODEFORMER}" == 1 ]]; then
   log "Installing optional CodeFormer environment"
@@ -124,19 +142,21 @@ if [[ "${INSTALL_CODEFORMER}" == 1 ]]; then
 fi
 
 log "Verifying the installation"
-for model_file in \
-  liveportrait/base_models/appearance_feature_extractor.pth \
-  liveportrait/base_models/motion_extractor.pth \
-  liveportrait/base_models/spade_generator.pth \
-  liveportrait/base_models/warping_module.pth \
-  liveportrait/landmark.onnx \
-  liveportrait/retargeting_models/stitching_retargeting_module.pth \
-  insightface/models/buffalo_l/2d106det.onnx \
-  insightface/models/buffalo_l/det_10g.onnx; do
-  test -s "${LIVEPORTRAIT_DIR}/pretrained_weights/${model_file}" || \
-    die "Missing LivePortrait model: ${model_file}"
-done
-conda_run liveportrait python -c "import torch, cv2, onnxruntime; assert torch.cuda.is_available(); print('LivePortrait CUDA:', torch.cuda.get_device_name(0))"
+if [[ "${INSTALL_LIVEPORTRAIT}" == 1 ]]; then
+  for model_file in \
+    liveportrait/base_models/appearance_feature_extractor.pth \
+    liveportrait/base_models/motion_extractor.pth \
+    liveportrait/base_models/spade_generator.pth \
+    liveportrait/base_models/warping_module.pth \
+    liveportrait/landmark.onnx \
+    liveportrait/retargeting_models/stitching_retargeting_module.pth \
+    insightface/models/buffalo_l/2d106det.onnx \
+    insightface/models/buffalo_l/det_10g.onnx; do
+    test -s "${LIVEPORTRAIT_DIR}/pretrained_weights/${model_file}" || \
+      die "Missing LivePortrait model: ${model_file}"
+  done
+  conda_run liveportrait python -c "import torch, cv2, onnxruntime; assert torch.cuda.is_available(); print('LivePortrait CUDA:', torch.cuda.get_device_name(0))"
+fi
 if [[ "${INSTALL_CODEFORMER}" == 1 ]]; then
   test -s "${CODEFORMER_DIR}/weights/CodeFormer/codeformer.pth"
   (
@@ -147,7 +167,11 @@ fi
 
 echo
 echo "Installation completed. No service was changed or restarted."
-echo "LivePortrait: ${LIVEPORTRAIT_DIR}"
+if [[ "${INSTALL_LIVEPORTRAIT}" == 1 ]]; then
+  echo "LivePortrait: ${LIVEPORTRAIT_DIR}"
+else
+  echo "LivePortrait: skipped"
+fi
 if [[ "${INSTALL_CODEFORMER}" == 1 ]]; then
   echo "CodeFormer:   ${CODEFORMER_DIR}"
 else

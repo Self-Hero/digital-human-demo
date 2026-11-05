@@ -70,8 +70,10 @@ done
 [[ -s "${INPUT_VIDEO}" ]] || die "Video is missing: ${INPUT_VIDEO}"
 [[ -s "${INPUT_AUDIO}" ]] || die "Audio is missing: ${INPUT_AUDIO}"
 [[ -x "${CONDA_BIN}" ]] || die "Conda is missing: ${CONDA_BIN}"
-[[ -d "${LIVEPORTRAIT_DIR}" ]] || die "Run deploy/install_face_pipeline.sh first"
-[[ -d "${CODEFORMER_DIR}" ]] || die "Run deploy/install_face_pipeline.sh first"
+[[ -d "${LIVEPORTRAIT_DIR}" ]] || \
+  die "LivePortrait is optional and missing. Install it explicitly with INSTALL_LIVEPORTRAIT=1."
+[[ -d "${CODEFORMER_DIR}" ]] || \
+  die "CodeFormer is optional and missing. Install it explicitly with INSTALL_CODEFORMER=1."
 [[ -d "${LIVETALKING_DIR}" ]] || die "LiveTalking is missing: ${LIVETALKING_DIR}"
 
 WORK_DIR="${WORK_DIR:-${DATA_ROOT}/output/${AVATAR_ID}}"

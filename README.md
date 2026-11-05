@@ -11,14 +11,14 @@
 - `docs/IMPLEMENTATION_PLAN.md`：按阶段接入真实云 API 和 MuseTalk 的实施计划。
 - `docs/PUBLIC_SERVER_DEPLOYMENT.md`：新公网 GPU 服务器的地址、端口和 TURN/HTTPS 部署边界。
 - `docs/ONE_CLICK_DEPLOYMENT.md`：Ubuntu GPU 服务器一键安装、验证和人物素材接入；
-  MuseTalk/LiveTalking 使用独立环境，不修改 SoulX-FlashHead 环境。
+  默认只部署单路 MuseTalk 实时栈，不安装 SoulX、LivePortrait 或 CodeFormer。
 
 公开仓库可直接部署：
 
 ```bash
 git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-human-demo
 cd /data/digital-human-demo
-bash deploy/bootstrap_server.sh --public-ip 36.103.177.214 --public-port 9000
+bash deploy/install_full_stack.sh --public-ip 36.103.177.214 --public-port 9000
 ```
 
 安装完成后，单独处理人物素材并启动 LiveTalking：
