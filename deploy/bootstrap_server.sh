@@ -30,6 +30,9 @@ SKIP_MODELS=0
 SKIP_SERVICES=0
 VERIFY_ONLY=0
 ENABLE_SILENCE_INFERENCE=0
+ENABLE_GFPGAN=0
+MUSETALK_BATCH_SIZE=4
+GFPGAN_WAIT_MS=250
 
 usage() {
   cat <<'EOF'
@@ -41,6 +44,7 @@ and an Nginx public entrypoint on Ubuntu 22.04.
 Options:
   --public-ip IP             Public IPv4 used in CORS (default: 36.103.177.214)
   --public-port PORT         Nginx public HTTP port (default: 9000)
+  --enable-gfpgan            Enable the RTX 4090 realtime GFPGAN profile
   --enable-silence-inference Apply the optional zero-audio MuseTalk patch
   --skip-apt                 Do not install Ubuntu packages
   --skip-models              Do not download model weights
@@ -131,6 +135,12 @@ while (($#)); do
   case "$1" in
     --public-ip) require_option_value "$1" "${2:-}"; PUBLIC_IP="$2"; shift 2 ;;
     --public-port) require_option_value "$1" "${2:-}"; PUBLIC_PORT="$2"; shift 2 ;;
+    --enable-gfpgan)
+      ENABLE_GFPGAN=1
+      MUSETALK_BATCH_SIZE=8
+      GFPGAN_WAIT_MS=500
+      shift
+      ;;
     --enable-silence-inference) ENABLE_SILENCE_INFERENCE=1; shift ;;
     --skip-apt) SKIP_APT=1; shift ;;
     --skip-models) SKIP_MODELS=1; shift ;;
@@ -543,18 +553,18 @@ Environment=LIVETALKING_MOUTH_SHARPEN=0.18
 Environment=LIVETALKING_MOUTH_STRENGTH=0.25
 Environment=LIVETALKING_MOUTH_MOTION_THRESHOLD=0.15
 Environment=LIVETALKING_MOUTH_TRANSITION_FRAMES=4
-Environment=LIVETALKING_GFPGAN=0
+Environment=LIVETALKING_GFPGAN=${ENABLE_GFPGAN}
 Environment=LIVETALKING_GFPGAN_REPO=${DATA_ROOT}/GFPGAN
 Environment=LIVETALKING_GFPGAN_MODEL=${DATA_ROOT}/GFPGAN/experiments/pretrained_models/GFPGANv1.4.pth
 Environment=LIVETALKING_GFPGAN_BATCH_SIZE=2
 Environment=LIVETALKING_GFPGAN_AMP=1
 Environment=LIVETALKING_GFPGAN_BLEND=0.6
 Environment=LIVETALKING_GFPGAN_ASYNC=1
-Environment=LIVETALKING_GFPGAN_WAIT_MS=250
+Environment=LIVETALKING_GFPGAN_WAIT_MS=${GFPGAN_WAIT_MS}
 Environment=LIVETALKING_VIDEO_BITRATE_INITIAL=3000000
 Environment=LIVETALKING_VIDEO_BITRATE_MIN=1000000
 Environment=LIVETALKING_VIDEO_BITRATE_MAX=6000000
-ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size 4 --max_session 1 --fps 25 --listenport 8010 --stun ${STUN_URL}
+ExecStart=${LIVETALKING_PY} app.py --transport webrtc --model musetalk --avatar_id %i --batch_size ${MUSETALK_BATCH_SIZE} --max_session 1 --fps 25 --listenport 8010 --stun ${STUN_URL}
 Restart=on-failure
 RestartSec=5
 

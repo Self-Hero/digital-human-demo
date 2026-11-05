@@ -23,8 +23,13 @@
 git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-human-demo
 cd /data/digital-human-demo
 bash deploy/install_full_stack.sh \
-  --public-ip 36.103.177.214 --public-port 9000
+  --public-ip 36.103.177.214 --public-port 9000 \
+  --enable-gfpgan
 ```
+
+`--enable-gfpgan` 面向单路 RTX 4090，启用当前验证过的实时预设：MuseTalk
+batch 8、GFPGAN batch 2、AMP、异步 CUDA 流、0.6 融合和 500ms 等待上限。
+不传该参数时仍会安装 GFPGAN 运行时，但保持关闭，并使用 MuseTalk batch 4。
 
 换服务器时把 `--public-ip` 改为新机器公网 IP。当前云平台限制 `80/443/8080`，因此默认使用
 `9000`；云安全组必须放行 `9000/tcp`。其他平台可传入 `--public-port 80`。脚本默认使用清华 Miniconda/Conda/PyPI、
@@ -87,14 +92,16 @@ bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 `LIVETALKING_MOUTH_MOTION_THRESHOLD` 调整或关闭。昂贵的光流对齐默认关闭；
 只有明确设置 `LIVETALKING_MOUTH_OPTICAL_FLOW=1` 才会启用。
 
-GFPGAN 实时修复运行时会随完整部署安装，但默认关闭，不加载模型也不占用显存。
+GFPGAN 实时修复运行时会随完整部署安装，但未传 `--enable-gfpgan` 时默认关闭，
+不加载模型也不占用显存。
 设置 `LIVETALKING_GFPGAN=1` 后重启对应头像服务即可启用。实时路径直接处理
 MuseTalk 已生成的批量人脸块，不运行逐帧人脸检测。默认使用 AMP、batch 2 和 0.6
 融合强度；可通过 `LIVETALKING_GFPGAN_BATCH_SIZE`、
 `LIVETALKING_GFPGAN_AMP`、`LIVETALKING_GFPGAN_BLEND` 调整。
 默认启用 `LIVETALKING_GFPGAN_ASYNC=1`，GFPGAN 在独立 CUDA 流中修复上一批帧，
 MuseTalk 可同时生成下一批。输出仍按原顺序等待，等待超过
-`LIVETALKING_GFPGAN_WAIT_MS`（默认 250ms）时自动使用未修复帧，避免修复模型拖垮实时链路。
+`LIVETALKING_GFPGAN_WAIT_MS`（默认 250ms；4090 预设为 500ms）时自动使用未修复帧，
+避免修复模型拖垮实时链路。
 
 单独安装或更新 GFPGAN 运行时：
 

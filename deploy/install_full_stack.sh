@@ -11,6 +11,7 @@ PUBLIC_PORT="9000"
 AVATAR_SOURCE=""
 AVATAR_ID="ma_renda_dynamic"
 ENABLE_SILENCE_INFERENCE=0
+ENABLE_GFPGAN=0
 
 usage() {
   cat <<'EOF'
@@ -28,6 +29,7 @@ Options:
   --public-port PORT      Nginx HTTP port (default: 9000)
   --avatar-source PATH    Source video/image to preprocess
   --avatar-id ID          Avatar id (default: ma_renda_dynamic)
+  --enable-gfpgan         Enable the validated RTX 4090 realtime profile
   --enable-silence-inference
                           Enable optional zero-audio MuseTalk inference
   -h, --help              Show this help
@@ -51,6 +53,7 @@ while (($#)); do
     --public-port) require_value "$1" "${2:-}"; PUBLIC_PORT="$2"; shift 2 ;;
     --avatar-source) require_value "$1" "${2:-}"; AVATAR_SOURCE="$2"; shift 2 ;;
     --avatar-id) require_value "$1" "${2:-}"; AVATAR_ID="$2"; shift 2 ;;
+    --enable-gfpgan) ENABLE_GFPGAN=1; shift ;;
     --enable-silence-inference) ENABLE_SILENCE_INFERENCE=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown option: $1" ;;
@@ -81,11 +84,18 @@ bootstrap_args=(
 if ((ENABLE_SILENCE_INFERENCE)); then
   bootstrap_args+=(--enable-silence-inference)
 fi
+if ((ENABLE_GFPGAN)); then
+  bootstrap_args+=(--enable-gfpgan)
+fi
 
 echo "[1/3] Installing the digital-human application, LiveTalking and MuseTalk"
 bash "${PROJECT_DIR}/deploy/bootstrap_server.sh" "${bootstrap_args[@]}"
 
-echo "[2/3] Installing the optional realtime GFPGAN runtime (disabled by default)"
+if ((ENABLE_GFPGAN)); then
+  echo "[2/3] Installing and enabling the realtime GFPGAN RTX 4090 profile"
+else
+  echo "[2/3] Installing the optional realtime GFPGAN runtime (disabled by default)"
+fi
 bash "${PROJECT_DIR}/deploy/install_gfpgan.sh"
 
 if [[ -n "${AVATAR_SOURCE}" ]]; then
@@ -100,6 +110,11 @@ cat <<EOF
 
 Full-stack installation completed.
 EOF
+if ((ENABLE_GFPGAN)); then
+  echo "Realtime GFPGAN: enabled (MuseTalk batch 8, GFPGAN batch 2, wait 500ms)"
+else
+  echo "Realtime GFPGAN: disabled (MuseTalk batch 4)"
+fi
 if [[ "${PUBLIC_PORT}" == 80 ]]; then
   echo "Public page: http://${PUBLIC_IP}/"
 else

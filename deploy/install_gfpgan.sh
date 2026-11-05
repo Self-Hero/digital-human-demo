@@ -109,5 +109,6 @@ log "Verifying GFPGAN"
 )
 
 echo
-echo "GFPGAN realtime runtime installed. The feature remains disabled by default."
+echo "GFPGAN realtime runtime installed."
+echo "Activation is controlled by LIVETALKING_GFPGAN in the systemd service."
 echo "Model: ${MODEL_PATH}"

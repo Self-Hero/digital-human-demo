@@ -18,8 +18,12 @@
 ```bash
 git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-human-demo
 cd /data/digital-human-demo
-bash deploy/install_full_stack.sh --public-ip 36.103.177.214 --public-port 9000
+bash deploy/install_full_stack.sh \
+  --public-ip 36.103.177.214 --public-port 9000 \
+  --enable-gfpgan
 ```
+
+`--enable-gfpgan` 启用单路 RTX 4090 实测配置；省略时仍安装运行时，但默认关闭 GFPGAN。
 
 安装完成后，单独处理人物素材并启动 LiveTalking：
 
