@@ -47,13 +47,13 @@ class MouthTemporalStabilizer:
             "LIVETALKING_MOUTH_MASK_CENTER_Y", 0.72, 0.55, 0.90
         )
         self.local_mask_radius_x = _env_float(
-            "LIVETALKING_MOUTH_MASK_RADIUS_X", 0.25, 0.15, 0.45
+            "LIVETALKING_MOUTH_MASK_RADIUS_X", 0.38, 0.15, 0.45
         )
         self.local_mask_radius_y = _env_float(
-            "LIVETALKING_MOUTH_MASK_RADIUS_Y", 0.11, 0.08, 0.30
+            "LIVETALKING_MOUTH_MASK_RADIUS_Y", 0.27, 0.08, 0.30
         )
         self.local_mask_feather = _env_float(
-            "LIVETALKING_MOUTH_MASK_FEATHER", 0.018, 0.01, 0.08
+            "LIVETALKING_MOUTH_MASK_FEATHER", 0.035, 0.01, 0.08
         )
         self.optical_flow = _env_enabled(
             "LIVETALKING_MOUTH_OPTICAL_FLOW", "0"

@@ -30,7 +30,6 @@ def test_local_compositor_preserves_face_outside_mouth(monkeypatch) -> None:
 
     assert np.array_equal(result[15, 25], reference[15, 25])
     assert np.array_equal(result[40, 60], reference[40, 60])
-    assert float(result[95, 60].mean()) < float(reference[95, 60].mean()) + 30
     assert float(result[82, 60].mean()) > float(reference[82, 60].mean()) + 100
 
 
@@ -50,6 +49,7 @@ def test_local_compositor_mask_size_is_configurable(monkeypatch) -> None:
     )
 
     assert np.array_equal(result[82, 40], reference[82, 40])
+    assert float(result[95, 60].mean()) < float(reference[95, 60].mean()) + 10
     assert float(result[82, 60].mean()) > float(reference[82, 60].mean()) + 100
 
 
