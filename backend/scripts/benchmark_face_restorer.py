@@ -25,19 +25,27 @@ def parse_args() -> argparse.Namespace:
 
 def load_gfpgan(args: argparse.Namespace, device: torch.device):
     sys.path.insert(0, str(args.repo.resolve()))
-    from gfpgan import GFPGANer
+    from gfpgan.archs.gfpganv1_clean_arch import GFPGANv1Clean
 
-    restorer = GFPGANer(
-        model_path=str(args.checkpoint.resolve()),
-        upscale=1,
-        arch="clean",
+    network = GFPGANv1Clean(
+        out_size=512,
+        num_style_feat=512,
         channel_multiplier=2,
-        bg_upsampler=None,
-        device=device,
-    )
+        decoder_load_path=None,
+        fix_decoder=False,
+        num_mlp=8,
+        input_is_latent=True,
+        different_w=True,
+        narrow=1,
+        sft_half=True,
+    ).to(device)
+    checkpoint = torch.load(args.checkpoint.resolve(), map_location="cpu")
+    state_dict = checkpoint.get("params_ema", checkpoint.get("params", checkpoint))
+    network.load_state_dict(state_dict, strict=True)
+    network.eval()
 
     def infer(tensor: torch.Tensor) -> torch.Tensor:
-        return restorer.gfpgan(
+        return network(
             tensor,
             return_rgb=False,
             weight=0.5,
