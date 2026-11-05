@@ -105,8 +105,15 @@ class RealtimeGFPGANEnhancer:
         network.eval()
         self.network = network
 
+        # Match the non-contiguous HWC-to-CHW layout used by real decoded frames.
         warmup = torch.zeros(
-            self.batch_size, 3, 512, 512, device=self.device
+            self.batch_size, 256, 256, 3, device=self.device
+        ).permute(0, 3, 1, 2)
+        warmup = F.interpolate(
+            warmup,
+            size=(512, 512),
+            mode="bicubic",
+            align_corners=False,
         )
         with torch.inference_mode(), self._autocast():
             self.network(warmup, return_rgb=False, weight=0.5)

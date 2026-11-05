@@ -52,6 +52,19 @@ else
   log "Keeping existing GFPGAN checkout because it has tracked changes"
 fi
 
+# Torch 2.9 may return a non-contiguous encoder feature tensor for real image
+# batches. GFPGAN v1.4 uses view(), which only happened to work for the zero
+# warmup tensor. reshape() is equivalent here and supports both layouts.
+gfpgan_arch="${GFPGAN_DIR}/gfpgan/archs/gfpganv1_clean_arch.py"
+[[ -f "${gfpgan_arch}" ]] || die "GFPGAN architecture is missing: ${gfpgan_arch}"
+if grep -qF 'feat.view(feat.size(0), -1)' "${gfpgan_arch}"; then
+  sed -i \
+    's/feat\.view(feat\.size(0), -1)/feat.reshape(feat.size(0), -1)/' \
+    "${gfpgan_arch}"
+fi
+grep -qF 'feat.reshape(feat.size(0), -1)' "${gfpgan_arch}" || \
+  die "Unable to apply the Torch 2.9 GFPGAN tensor-layout compatibility patch."
+
 log "Installing GFPGAN runtime into the LiveTalking environment"
 conda_run python -m pip install --no-build-isolation --no-deps \
   addict==2.4.0 future==1.0.0 lmdb==1.7.5 scikit-image==0.25.2 \
