@@ -44,6 +44,8 @@ def test_interpolation_preserves_current_frame_and_blends_residual(monkeypatch) 
         module.RealtimeGFPGANEnhancer
     )
     enhancer.blend = 0.5
+    enhancer.protect_mouth = False
+    enhancer._mouth_gain_cache = {}
 
     frames = np.arange(8, dtype=np.uint8).reshape(8, 1, 1, 1) * 10
     indices = (0, 2, 5, 7)
@@ -60,3 +62,23 @@ def test_interpolation_preserves_current_frame_and_blends_residual(monkeypatch) 
     assert int(result[1, 0, 0, 0]) == 17
     assert int(result[3, 0, 0, 0]) == 41
     assert int(result[7, 0, 0, 0]) == 90
+
+
+def test_mouth_protection_suppresses_only_central_mouth_residual(monkeypatch) -> None:
+    module = _load_module(monkeypatch)
+    enhancer = module.RealtimeGFPGANEnhancer.__new__(
+        module.RealtimeGFPGANEnhancer
+    )
+    enhancer.protect_mouth = True
+    enhancer.mouth_center_y = 0.70
+    enhancer.mouth_radius_x = 0.28
+    enhancer.mouth_radius_y = 0.15
+    enhancer.mouth_feather = 0.30
+    enhancer.mouth_residual_scale = 0.0
+    enhancer._mouth_gain_cache = {}
+
+    gain = enhancer._mouth_residual_gain(101, 101)
+
+    assert float(gain[70, 50, 0]) == 0.0
+    assert float(gain[10, 50, 0]) == 1.0
+    assert 0.0 < float(gain[70, 75, 0]) < 1.0

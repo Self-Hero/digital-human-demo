@@ -259,6 +259,25 @@ class RealtimeGFPGANEnhancer:
         self.enabled = _enabled("LIVETALKING_GFPGAN", "0")
         self.blend = _floating("LIVETALKING_GFPGAN_BLEND", 0.6, 0.0, 1.0)
         self.interval = _integer("LIVETALKING_GFPGAN_INTERVAL", 1, 1, 4)
+        self.protect_mouth = _enabled(
+            "LIVETALKING_GFPGAN_PROTECT_MOUTH",
+            "1" if self.interval > 1 else "0",
+        )
+        self.mouth_center_y = _floating(
+            "LIVETALKING_GFPGAN_MOUTH_CENTER_Y", 0.70, 0.0, 1.0
+        )
+        self.mouth_radius_x = _floating(
+            "LIVETALKING_GFPGAN_MOUTH_RADIUS_X", 0.28, 0.05, 0.5
+        )
+        self.mouth_radius_y = _floating(
+            "LIVETALKING_GFPGAN_MOUTH_RADIUS_Y", 0.15, 0.05, 0.5
+        )
+        self.mouth_feather = _floating(
+            "LIVETALKING_GFPGAN_MOUTH_FEATHER", 0.30, 0.01, 1.0
+        )
+        self.mouth_residual_scale = _floating(
+            "LIVETALKING_GFPGAN_MOUTH_RESIDUAL_SCALE", 0.0, 0.0, 1.0
+        )
         self.async_enabled = _enabled("LIVETALKING_GFPGAN_ASYNC", "1")
         self.wait_seconds = _integer(
             "LIVETALKING_GFPGAN_WAIT_MS", 250, 20, 2000
@@ -268,6 +287,7 @@ class RealtimeGFPGANEnhancer:
         self._timeout_count = 0
         self._bypass_count = 0
         self._latencies_ms: deque[float] = deque(maxlen=100)
+        self._mouth_gain_cache: dict[tuple[int, int], np.ndarray] = {}
         self._jobs: queue.Queue = queue.Queue(maxsize=2)
         self._worker = None
 
@@ -284,9 +304,11 @@ class RealtimeGFPGANEnhancer:
 
         if self.enabled:
             logger.info(
-                "Realtime GFPGAN: enabled interval=%d blend=%.2f async=%s wait=%dms",
+                "Realtime GFPGAN: enabled interval=%d blend=%.2f "
+                "protect_mouth=%s async=%s wait=%dms",
                 self.interval,
                 self.blend,
+                self.protect_mouth,
                 self.async_enabled,
                 round(self.wait_seconds * 1000),
             )
@@ -318,7 +340,35 @@ class RealtimeGFPGANEnhancer:
                         + key_residuals[segment + 1] * alpha
                     )
 
+        residuals *= self._mouth_residual_gain(frames.shape[1], frames.shape[2])
         return np.clip(original + residuals * self.blend, 0, 255).astype(np.uint8)
+
+    def _mouth_residual_gain(self, height: int, width: int):
+        if not self.protect_mouth:
+            return 1.0
+        key = (height, width)
+        cached = self._mouth_gain_cache.get(key)
+        if cached is not None:
+            return cached
+
+        y, x = np.ogrid[:height, :width]
+        normalized_x = (x / max(1, width - 1) - 0.5) / self.mouth_radius_x
+        normalized_y = (
+            y / max(1, height - 1) - self.mouth_center_y
+        ) / self.mouth_radius_y
+        distance = np.sqrt(normalized_x**2 + normalized_y**2)
+        inner_edge = max(0.0, 1.0 - self.mouth_feather)
+        edge = np.clip(
+            (distance - inner_edge) / max(self.mouth_feather, 1e-6),
+            0.0,
+            1.0,
+        )
+        gain = self.mouth_residual_scale + (
+            1.0 - self.mouth_residual_scale
+        ) * edge
+        cached = gain.astype(np.float32)[..., None]
+        self._mouth_gain_cache[key] = cached
+        return cached
 
     def _enhance_batch(self, frames: np.ndarray) -> np.ndarray:
         if not self.enabled or self.runtime is None or self.blend <= 0:
@@ -332,17 +382,9 @@ class RealtimeGFPGANEnhancer:
         try:
             indices = _keyframe_indices(len(frames), self.interval)
             restored_keyframes = self.runtime.restore(frames[list(indices)])
-            if len(indices) == len(frames):
-                restored = np.clip(
-                    restored_keyframes.astype(np.float32) * self.blend
-                    + frames.astype(np.float32) * (1.0 - self.blend),
-                    0,
-                    255,
-                ).astype(np.uint8)
-            else:
-                restored = self._interpolate_restoration(
-                    frames, indices, restored_keyframes
-                )
+            restored = self._interpolate_restoration(
+                frames, indices, restored_keyframes
+            )
 
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             self._latencies_ms.append(elapsed_ms)

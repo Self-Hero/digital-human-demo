@@ -111,7 +111,7 @@ cat <<EOF
 Full-stack installation completed.
 EOF
 if ((ENABLE_GFPGAN)); then
-  echo "Realtime GFPGAN: enabled (MuseTalk batch 8, GFPGAN batch 2, interval 2, wait 500ms)"
+  echo "Realtime GFPGAN: enabled (MuseTalk batch 8, GFPGAN batch 2, interval 2, mouth protected, wait 500ms)"
 else
   echo "Realtime GFPGAN: disabled (MuseTalk batch 4)"
 fi

@@ -28,7 +28,8 @@ bash deploy/install_full_stack.sh \
 ```
 
 `--enable-gfpgan` 面向单路 RTX 4090，启用实时预设：MuseTalk batch 8、GFPGAN
-batch 2、AMP、异步 CUDA 流、隔帧修复、逐帧残差插值、0.6 融合和 500ms 等待上限。
+batch 2、AMP、异步 CUDA 流、隔帧修复、嘴部保护残差插值、0.6 融合和 500ms
+等待上限。嘴部时序稳定强度同时降为 0.10，减少细小音素被前一帧抹平。
 不传该参数时仍会安装 GFPGAN 运行时，但保持关闭，并使用 MuseTalk batch 4。
 
 换服务器时把 `--public-ip` 改为新机器公网 IP。当前云平台限制 `80/443/8080`，因此默认使用
@@ -106,7 +107,9 @@ MuseTalk 可同时生成下一批。输出仍按原顺序等待，等待超过
 GFPGAN 权重在服务启动阶段加载并预热一次，后续 WebRTC 会话复用同一进程级网络；
 队列、超时和时序状态仍由各会话独立维护。`LIVETALKING_GFPGAN_INTERVAL=2`
 只修复每批均匀分布的关键帧，其余帧使用前后关键帧的修复残差插值，保留当前帧嘴型，
-不会直接复用上一帧完整人脸。设置为 `1` 可恢复逐帧 GFPGAN。
+不会直接复用上一帧完整人脸。`LIVETALKING_GFPGAN_PROTECT_MOUTH=1` 会在嘴唇和
+牙齿区域平滑抑制 GFPGAN 残差，脸部其他区域继续修复。设置 interval 为 `1` 可恢复
+逐帧 GFPGAN；设置 protect mouth 为 `0` 可恢复完整人脸残差。
 
 单独安装或更新 GFPGAN 运行时：
 
@@ -129,6 +132,8 @@ INSTALL_CODEFORMER=1 bash deploy/install_face_pipeline.sh
 [Service]
 Environment=LIVETALKING_GFPGAN=1
 Environment=LIVETALKING_GFPGAN_INTERVAL=2
+Environment=LIVETALKING_GFPGAN_PROTECT_MOUTH=1
+Environment=LIVETALKING_MOUTH_STRENGTH=0.10
 ```
 
 ```bash
