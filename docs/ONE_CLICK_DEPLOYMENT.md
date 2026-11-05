@@ -86,6 +86,25 @@ bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 `LIVETALKING_MOUTH_MOTION_THRESHOLD` 调整或关闭。昂贵的光流对齐默认关闭；
 只有明确设置 `LIVETALKING_MOUTH_OPTICAL_FLOW=1` 才会启用。
 
+GFPGAN 实时修复运行时会随完整部署安装，但默认关闭，不加载模型也不占用显存。
+设置 `LIVETALKING_GFPGAN=1` 后重启对应头像服务即可启用。实时路径直接处理
+MuseTalk 已生成的批量人脸块，不运行逐帧人脸检测。默认使用 AMP、batch 2 和 0.6
+融合强度；可通过 `LIVETALKING_GFPGAN_BATCH_SIZE`、
+`LIVETALKING_GFPGAN_AMP`、`LIVETALKING_GFPGAN_BLEND` 调整。
+
+单独安装或更新 GFPGAN 运行时：
+
+```bash
+bash deploy/install_gfpgan.sh
+```
+
+建议通过 systemd drop-in 为单个头像启用，而不是修改模板：
+
+```ini
+[Service]
+Environment=LIVETALKING_GFPGAN=1
+```
+
 ```bash
 bash deploy/bootstrap_server.sh --verify-only
 

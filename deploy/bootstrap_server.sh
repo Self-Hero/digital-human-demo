@@ -258,6 +258,7 @@ verify_deployment() {
   [[ -x "${BACKEND_UVICORN}" ]] || die "Backend virtual environment is missing."
   require_file "${LIVETALKING_DIR}/server/pcm_stream.py"
   require_file "${LIVETALKING_DIR}/avatars/mouth_stabilizer.py"
+  require_file "${LIVETALKING_DIR}/avatars/gfpgan_enhancer.py"
 
   (
     cd "${LIVETALKING_DIR}"
@@ -476,11 +477,16 @@ cp "${PROJECT_DIR}/deploy/livetalking_pcm_stream.py" \
   "${LIVETALKING_DIR}/server/pcm_stream.py"
 cp "${PROJECT_DIR}/deploy/livetalking_mouth_stabilizer.py" \
   "${LIVETALKING_DIR}/avatars/mouth_stabilizer.py"
+cp "${PROJECT_DIR}/deploy/livetalking_gfpgan.py" \
+  "${LIVETALKING_DIR}/avatars/gfpgan_enhancer.py"
 "${BACKEND_PY}" \
   "${PROJECT_DIR}/backend/scripts/configure_livetalking_pcm_stream.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" \
   "${PROJECT_DIR}/backend/scripts/configure_livetalking_mouth_stabilizer.py" \
+  --livetalking-dir "${LIVETALKING_DIR}"
+"${BACKEND_PY}" \
+  "${PROJECT_DIR}/backend/scripts/configure_livetalking_gfpgan.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" "${PROJECT_DIR}/backend/scripts/configure_livetalking_video.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
@@ -537,6 +543,12 @@ Environment=LIVETALKING_MOUTH_SHARPEN=0.18
 Environment=LIVETALKING_MOUTH_STRENGTH=0.25
 Environment=LIVETALKING_MOUTH_MOTION_THRESHOLD=0.15
 Environment=LIVETALKING_MOUTH_TRANSITION_FRAMES=4
+Environment=LIVETALKING_GFPGAN=0
+Environment=LIVETALKING_GFPGAN_REPO=${DATA_ROOT}/GFPGAN
+Environment=LIVETALKING_GFPGAN_MODEL=${DATA_ROOT}/GFPGAN/experiments/pretrained_models/GFPGANv1.4.pth
+Environment=LIVETALKING_GFPGAN_BATCH_SIZE=2
+Environment=LIVETALKING_GFPGAN_AMP=1
+Environment=LIVETALKING_GFPGAN_BLEND=0.6
 Environment=LIVETALKING_VIDEO_BITRATE_INITIAL=3000000
 Environment=LIVETALKING_VIDEO_BITRATE_MIN=1000000
 Environment=LIVETALKING_VIDEO_BITRATE_MAX=6000000

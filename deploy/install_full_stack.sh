@@ -16,7 +16,7 @@ usage() {
   cat <<'EOF'
 Usage: bash deploy/install_full_stack.sh OPTIONS
 
-Installs the application, LiveTalking, MuseTalk and LivePortrait,
+Installs the application, LiveTalking, MuseTalk, LivePortrait and GFPGAN,
 Nginx and systemd services. If an avatar source is supplied, it also
 preprocesses that avatar and starts its LiveTalking instance.
 
@@ -81,18 +81,21 @@ if ((ENABLE_SILENCE_INFERENCE)); then
   bootstrap_args+=(--enable-silence-inference)
 fi
 
-echo "[1/3] Installing the digital-human application, LiveTalking and MuseTalk"
+echo "[1/4] Installing the digital-human application, LiveTalking and MuseTalk"
 bash "${PROJECT_DIR}/deploy/bootstrap_server.sh" "${bootstrap_args[@]}"
 
-echo "[2/3] Installing LivePortrait (CodeFormer is optional and skipped)"
+echo "[2/4] Installing LivePortrait (CodeFormer is optional and skipped)"
 bash "${PROJECT_DIR}/deploy/install_face_pipeline.sh"
 
+echo "[3/4] Installing the optional realtime GFPGAN runtime (disabled by default)"
+bash "${PROJECT_DIR}/deploy/install_gfpgan.sh"
+
 if [[ -n "${AVATAR_SOURCE}" ]]; then
-  echo "[3/3] Preparing and starting avatar ${AVATAR_ID}"
+  echo "[4/4] Preparing and starting avatar ${AVATAR_ID}"
   bash "${PROJECT_DIR}/deploy/start_avatar.sh" \
     --avatar-source "${AVATAR_SOURCE}" --avatar-id "${AVATAR_ID}"
 else
-  echo "[3/3] Avatar preparation skipped because --avatar-source was not supplied"
+  echo "[4/4] Avatar preparation skipped because --avatar-source was not supplied"
 fi
 
 cat <<EOF
