@@ -76,9 +76,10 @@ class RealtimeGFPGANEnhancer:
         self._stream = None
         if self.enabled:
             try:
+                if self.async_enabled and torch.cuda.is_available():
+                    self._stream = torch.cuda.Stream(device=self.device)
                 self._load()
                 if self.async_enabled:
-                    self._stream = torch.cuda.Stream(device=self.device)
                     self._worker = threading.Thread(
                         target=self._run_worker,
                         name="livetalking-gfpgan",
@@ -139,9 +140,17 @@ class RealtimeGFPGANEnhancer:
             mode="bicubic",
             align_corners=False,
         )
-        with torch.inference_mode(), self._autocast():
+        stream_context = (
+            torch.cuda.stream(self._stream)
+            if self._stream is not None
+            else contextlib.nullcontext()
+        )
+        with stream_context, torch.inference_mode(), self._autocast():
             self.network(warmup, return_rgb=False, weight=0.5)
-        torch.cuda.synchronize(self.device)
+        if self._stream is not None:
+            self._stream.synchronize()
+        else:
+            torch.cuda.synchronize(self.device)
         logger.info(
             "Realtime GFPGAN: enabled model=%s batch=%d amp=%s blend=%.2f async=%s",
             self.checkpoint,
