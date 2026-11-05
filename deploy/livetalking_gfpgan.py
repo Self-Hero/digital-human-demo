@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import contextlib
 import os
+import queue
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -40,6 +42,13 @@ def _floating(name: str, default: float, minimum: float, maximum: float) -> floa
     return min(maximum, max(minimum, value))
 
 
+class _DeferredFrame:
+    def __init__(self, original: np.ndarray) -> None:
+        self.original = original
+        self.result = original
+        self.ready = threading.Event()
+
+
 class RealtimeGFPGANEnhancer:
     """Restore decoded MuseTalk batches without detection or filesystem I/O."""
 
@@ -48,6 +57,10 @@ class RealtimeGFPGANEnhancer:
         self.amp = _enabled("LIVETALKING_GFPGAN_AMP", "1")
         self.batch_size = _integer("LIVETALKING_GFPGAN_BATCH_SIZE", 2, 1, 8)
         self.blend = _floating("LIVETALKING_GFPGAN_BLEND", 0.6, 0.0, 1.0)
+        self.async_enabled = _enabled("LIVETALKING_GFPGAN_ASYNC", "1")
+        self.wait_seconds = _integer(
+            "LIVETALKING_GFPGAN_WAIT_MS", 250, 20, 2000
+        ) / 1000.0
         self.repo = Path(os.getenv("LIVETALKING_GFPGAN_REPO", "/data/GFPGAN"))
         self.checkpoint = Path(
             os.getenv(
@@ -58,9 +71,20 @@ class RealtimeGFPGANEnhancer:
         self.device = torch.device("cuda:0")
         self.network = None
         self._batch_count = 0
+        self._jobs: queue.Queue = queue.Queue(maxsize=2)
+        self._worker = None
+        self._stream = None
         if self.enabled:
             try:
                 self._load()
+                if self.async_enabled:
+                    self._stream = torch.cuda.Stream(device=self.device)
+                    self._worker = threading.Thread(
+                        target=self._run_worker,
+                        name="livetalking-gfpgan",
+                        daemon=True,
+                    )
+                    self._worker.start()
             except Exception:
                 self.enabled = False
                 logger.exception(
@@ -119,11 +143,12 @@ class RealtimeGFPGANEnhancer:
             self.network(warmup, return_rgb=False, weight=0.5)
         torch.cuda.synchronize(self.device)
         logger.info(
-            "Realtime GFPGAN: enabled model=%s batch=%d amp=%s blend=%.2f",
+            "Realtime GFPGAN: enabled model=%s batch=%d amp=%s blend=%.2f async=%s",
             self.checkpoint,
             self.batch_size,
             self.amp,
             self.blend,
+            self.async_enabled,
         )
 
     def _autocast(self):
@@ -131,7 +156,7 @@ class RealtimeGFPGANEnhancer:
             return torch.autocast(device_type="cuda", dtype=torch.float16)
         return contextlib.nullcontext()
 
-    def enhance_batch(self, frames: np.ndarray) -> np.ndarray:
+    def _enhance_batch(self, frames: np.ndarray) -> np.ndarray:
         if not self.enabled or self.network is None or self.blend <= 0:
             return frames
         if not isinstance(frames, np.ndarray) or frames.ndim != 4:
@@ -195,3 +220,47 @@ class RealtimeGFPGANEnhancer:
             self.enabled = False
             logger.exception("Disabling realtime GFPGAN after inference failure")
             return frames
+
+    def enhance_batch(self, frames: np.ndarray) -> np.ndarray:
+        """Synchronous entry point retained for benchmarks and fallback mode."""
+        return self._enhance_batch(frames)
+
+    def enhance_batch_async(self, frames: np.ndarray):
+        """Queue restoration while allowing MuseTalk to start its next batch."""
+        if not self.enabled or not self.async_enabled or self._worker is None:
+            return self._enhance_batch(frames)
+
+        deferred = [_DeferredFrame(frame) for frame in frames]
+        try:
+            self._jobs.put_nowait((frames, deferred))
+        except queue.Full:
+            logger.warning("Realtime GFPGAN queue full; bypassing one batch")
+            return frames
+        return deferred
+
+    def resolve_frame(self, frame):
+        if not isinstance(frame, _DeferredFrame):
+            return frame
+        if not frame.ready.wait(self.wait_seconds):
+            logger.warning("Realtime GFPGAN timed out; using the original face crop")
+            return frame.original
+        return frame.result
+
+    def _run_worker(self) -> None:
+        while True:
+            frames, deferred = self._jobs.get()
+            try:
+                if self._stream is None:
+                    restored = self._enhance_batch(frames)
+                else:
+                    with torch.cuda.stream(self._stream):
+                        restored = self._enhance_batch(frames)
+                for item, result in zip(deferred, restored):
+                    item.result = result
+            except Exception:
+                logger.exception("Realtime GFPGAN worker failed; bypassing batch")
+                self.enabled = False
+            finally:
+                for item in deferred:
+                    item.ready.set()
+                self._jobs.task_done()

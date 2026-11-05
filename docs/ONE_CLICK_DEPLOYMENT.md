@@ -92,6 +92,9 @@ GFPGAN 实时修复运行时会随完整部署安装，但默认关闭，不加�
 MuseTalk 已生成的批量人脸块，不运行逐帧人脸检测。默认使用 AMP、batch 2 和 0.6
 融合强度；可通过 `LIVETALKING_GFPGAN_BATCH_SIZE`、
 `LIVETALKING_GFPGAN_AMP`、`LIVETALKING_GFPGAN_BLEND` 调整。
+默认启用 `LIVETALKING_GFPGAN_ASYNC=1`，GFPGAN 在独立 CUDA 流中修复上一批帧，
+MuseTalk 可同时生成下一批。输出仍按原顺序等待，等待超过
+`LIVETALKING_GFPGAN_WAIT_MS`（默认 250ms）时自动使用未修复帧，避免修复模型拖垮实时链路。
 
 单独安装或更新 GFPGAN 运行时：
 

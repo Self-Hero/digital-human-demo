@@ -21,9 +21,20 @@ PATCHED_AVATAR = (
 INFERENCE_ANCHOR = """        pred = self.vae.decode_latents(pred_latents)
         return pred
 """
-PATCHED_INFERENCE = """        pred = self.vae.decode_latents(pred_latents)
+SYNC_INFERENCE = """        pred = self.vae.decode_latents(pred_latents)
         pred = self.gfpgan_enhancer.enhance_batch(pred)
         return pred
+"""
+PATCHED_INFERENCE = """        pred = self.vae.decode_latents(pred_latents)
+        pred = self.gfpgan_enhancer.enhance_batch_async(pred)
+        return pred
+"""
+PASTE_ANCHOR = """    def paste_back_frame(self,pred_frame,idx:int):
+        bbox = self.coord_list_cycle[idx]
+"""
+PATCHED_PASTE = """    def paste_back_frame(self,pred_frame,idx:int):
+        pred_frame = self.gfpgan_enhancer.resolve_frame(pred_frame)
+        bbox = self.coord_list_cycle[idx]
 """
 
 
@@ -40,6 +51,7 @@ def configure(source: Path) -> str:
         PATCHED_IMPORT in text
         and PATCHED_AVATAR in text
         and PATCHED_INFERENCE in text
+        and PATCHED_PASTE in text
     ):
         return "already configured"
 
@@ -53,8 +65,17 @@ def configure(source: Path) -> str:
             updated, AVATAR_ANCHOR, PATCHED_AVATAR, "mouth stabilizer initialization"
         )
     if PATCHED_INFERENCE not in updated:
+        if SYNC_INFERENCE in updated:
+            updated = _replace_once(
+                updated, SYNC_INFERENCE, PATCHED_INFERENCE, "synchronous GFPGAN hook"
+            )
+        else:
+            updated = _replace_once(
+                updated, INFERENCE_ANCHOR, PATCHED_INFERENCE, "MuseTalk batch decode"
+            )
+    if PATCHED_PASTE not in updated:
         updated = _replace_once(
-            updated, INFERENCE_ANCHOR, PATCHED_INFERENCE, "MuseTalk batch decode"
+            updated, PASTE_ANCHOR, PATCHED_PASTE, "MuseTalk paste-back hook"
         )
 
     backup = source.with_suffix(source.suffix + ".before-gfpgan")
