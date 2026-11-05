@@ -43,6 +43,18 @@ class MouthTemporalStabilizer:
         self.sharpen_strength = _env_float(
             "LIVETALKING_MOUTH_SHARPEN", 0.18, 0.0, 0.6
         )
+        self.local_mask_center_y = _env_float(
+            "LIVETALKING_MOUTH_MASK_CENTER_Y", 0.72, 0.55, 0.90
+        )
+        self.local_mask_radius_x = _env_float(
+            "LIVETALKING_MOUTH_MASK_RADIUS_X", 0.25, 0.15, 0.45
+        )
+        self.local_mask_radius_y = _env_float(
+            "LIVETALKING_MOUTH_MASK_RADIUS_Y", 0.11, 0.08, 0.30
+        )
+        self.local_mask_feather = _env_float(
+            "LIVETALKING_MOUTH_MASK_FEATHER", 0.018, 0.01, 0.08
+        )
         self.optical_flow = _env_enabled(
             "LIVETALKING_MOUTH_OPTICAL_FLOW", "0"
         )
@@ -65,11 +77,15 @@ class MouthTemporalStabilizer:
         self._face_mask_cache: dict[tuple[int, int], np.ndarray] = {}
         logger.info(
             "MuseTalk mouth compositor: local=%s color_match=%.3f "
-            "sharpen=%.3f temporal=%s optical_flow=%s strength=%.3f threshold=%.3f "
-            "transition_frames=%d",
+            "sharpen=%.3f mask=(cy=%.3f rx=%.3f ry=%.3f feather=%.3f) "
+            "temporal=%s optical_flow=%s strength=%.3f threshold=%.3f transition_frames=%d",
             self.local_compositor,
             self.color_match_strength,
             self.sharpen_strength,
+            self.local_mask_center_y,
+            self.local_mask_radius_x,
+            self.local_mask_radius_y,
+            self.local_mask_feather,
             self.enabled,
             self.optical_flow,
             self.strength,
@@ -367,15 +383,18 @@ class MouthTemporalStabilizer:
         mask = np.zeros((height, width), dtype=np.float32)
         cv2.ellipse(
             mask,
-            (width // 2, int(height * 0.72)),
-            (max(1, int(width * 0.38)), max(1, int(height * 0.27))),
+            (width // 2, int(height * self.local_mask_center_y)),
+            (
+                max(1, int(width * self.local_mask_radius_x)),
+                max(1, int(height * self.local_mask_radius_y)),
+            ),
             0,
             0,
             360,
             1.0,
             -1,
         )
-        sigma = max(1.0, min(height, width) * 0.035)
+        sigma = max(1.0, min(height, width) * self.local_mask_feather)
         mask = cv2.GaussianBlur(mask, (0, 0), sigma)[..., None]
         self._face_mask_cache[key] = mask
         return mask
