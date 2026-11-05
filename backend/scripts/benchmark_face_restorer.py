@@ -19,6 +19,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--iterations", type=int, default=20)
     parser.add_argument("--amp", action="store_true")
+    parser.add_argument(
+        "--compile",
+        dest="compile_mode",
+        nargs="?",
+        const="default",
+        choices=("default", "reduce-overhead", "max-autotune"),
+        help="Compile the restoration network with the optional torch.compile mode",
+    )
     parser.add_argument("--fidelity", type=float, default=0.7)
     return parser.parse_args()
 
@@ -43,6 +51,8 @@ def load_gfpgan(args: argparse.Namespace, device: torch.device):
     state_dict = checkpoint.get("params_ema", checkpoint.get("params", checkpoint))
     network.load_state_dict(state_dict, strict=True)
     network.eval()
+    if args.compile_mode:
+        network = torch.compile(network, mode=args.compile_mode)
 
     def infer(tensor: torch.Tensor) -> torch.Tensor:
         return network(
@@ -68,6 +78,8 @@ def load_codeformer(args: argparse.Namespace, device: torch.device):
     checkpoint = torch.load(args.checkpoint.resolve(), map_location="cpu")
     network.load_state_dict(checkpoint["params_ema"])
     network.eval()
+    if args.compile_mode:
+        network = torch.compile(network, mode=args.compile_mode)
 
     def infer(tensor: torch.Tensor) -> torch.Tensor:
         return network(tensor, w=args.fidelity, adain=True)[0]
@@ -126,9 +138,11 @@ def main() -> None:
     loader = load_gfpgan if args.model == "gfpgan" else load_codeformer
     infer = loader(args, device)
     precision = "AMP FP16" if args.amp else "FP32"
+    compile_mode = args.compile_mode or "off"
     print(
-        f"model={args.model} precision={precision} gpu={torch.cuda.get_device_name(0)} "
-        f"warmup={args.warmup} iterations={args.iterations}",
+        f"model={args.model} precision={precision} compile={compile_mode} "
+        f"gpu={torch.cuda.get_device_name(0)} warmup={args.warmup} "
+        f"iterations={args.iterations}",
         flush=True,
     )
     print("batch  batch_ms  frame_ms  faces_per_second  peak_mib", flush=True)

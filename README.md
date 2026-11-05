@@ -23,7 +23,8 @@ bash deploy/install_full_stack.sh \
   --enable-gfpgan
 ```
 
-`--enable-gfpgan` 启用单路 RTX 4090 实测配置；省略时仍安装运行时，但默认关闭 GFPGAN。
+`--enable-gfpgan` 启用单路 RTX 4090 实时配置，包括进程级模型预热、隔帧修复和
+逐帧残差插值；省略时仍安装运行时，但默认关闭 GFPGAN。
 
 安装完成后，单独处理人物素材并启动 LiveTalking：
 

@@ -36,6 +36,16 @@ PATCHED_PASTE = """    def paste_back_frame(self,pred_frame,idx:int):
         pred_frame = self.gfpgan_enhancer.resolve_frame(pred_frame)
         bbox = self.coord_list_cycle[idx]
 """
+APP_IMPORT_ANCHOR = "from utils.logger import logger\n"
+PATCHED_APP_IMPORT = (
+    APP_IMPORT_ANCHOR
+    + "from avatars.gfpgan_enhancer import preload_realtime_gfpgan\n"
+)
+APP_WARMUP_ANCHOR = "        warm_up(opt.batch_size,model)"
+PATCHED_APP_WARMUP = (
+    APP_WARMUP_ANCHOR
+    + "\n        preload_realtime_gfpgan()"
+)
 
 
 def _replace_once(text: str, old: str, new: str, description: str) -> str:
@@ -90,14 +100,50 @@ def configure(source: Path) -> str:
     return f"configured; backup: {backup}"
 
 
+def configure_app(source: Path) -> str:
+    text = source.read_text(encoding="utf-8")
+    if PATCHED_APP_IMPORT in text and PATCHED_APP_WARMUP in text:
+        return "already configured"
+
+    updated = text
+    if PATCHED_APP_IMPORT not in updated:
+        updated = _replace_once(
+            updated, APP_IMPORT_ANCHOR, PATCHED_APP_IMPORT, "app GFPGAN import"
+        )
+    if PATCHED_APP_WARMUP not in updated:
+        updated = _replace_once(
+            updated, APP_WARMUP_ANCHOR, PATCHED_APP_WARMUP, "MuseTalk startup warmup"
+        )
+
+    backup = source.with_suffix(source.suffix + ".before-gfpgan-preload")
+    if not backup.exists():
+        shutil.copy2(source, backup)
+    source.write_text(updated, encoding="utf-8")
+    try:
+        py_compile.compile(str(source), doraise=True)
+    except Exception:
+        source.write_text(text, encoding="utf-8")
+        raise
+    return f"configured; backup: {backup}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--livetalking-dir", type=Path, default=Path("/data/LiveTalking"))
+    parser.add_argument(
+        "--livetalking-dir", type=Path, default=Path("/data/LiveTalking")
+    )
     args = parser.parse_args()
-    source = args.livetalking_dir.expanduser().resolve() / "avatars" / "musetalk_avatar.py"
-    if not source.is_file():
-        raise FileNotFoundError(f"LiveTalking MuseTalk avatar not found: {source}")
-    print(f"{source}: {configure(source)}")
+    root = args.livetalking_dir.expanduser().resolve()
+    avatar_source = root / "avatars" / "musetalk_avatar.py"
+    app_source = root / "app.py"
+    if not avatar_source.is_file():
+        raise FileNotFoundError(
+            f"LiveTalking MuseTalk avatar not found: {avatar_source}"
+        )
+    if not app_source.is_file():
+        raise FileNotFoundError(f"LiveTalking app not found: {app_source}")
+    print(f"{avatar_source}: {configure(avatar_source)}")
+    print(f"{app_source}: {configure_app(app_source)}")
 
 
 if __name__ == "__main__":

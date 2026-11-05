@@ -29,7 +29,7 @@ Options:
   --public-port PORT      Nginx HTTP port (default: 9000)
   --avatar-source PATH    Source video/image to preprocess
   --avatar-id ID          Avatar id (default: ma_renda_dynamic)
-  --enable-gfpgan         Enable the validated RTX 4090 realtime profile
+  --enable-gfpgan         Enable the optimized RTX 4090 realtime profile
   --enable-silence-inference
                           Enable optional zero-audio MuseTalk inference
   -h, --help              Show this help
@@ -111,7 +111,7 @@ cat <<EOF
 Full-stack installation completed.
 EOF
 if ((ENABLE_GFPGAN)); then
-  echo "Realtime GFPGAN: enabled (MuseTalk batch 8, GFPGAN batch 2, wait 500ms)"
+  echo "Realtime GFPGAN: enabled (MuseTalk batch 8, GFPGAN batch 2, interval 2, wait 500ms)"
 else
   echo "Realtime GFPGAN: disabled (MuseTalk batch 4)"
 fi
