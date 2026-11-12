@@ -238,10 +238,14 @@ check_platform() {
     fi
     [[ -w "${DATA_ROOT}" ]] || die "${DATA_ROOT} is not writable by ${DEPLOY_USER}."
 
-    local available_kb
+    local available_kb required_free_gib
     available_kb="$(df -Pk "${DATA_ROOT}" | awk 'NR==2 {print $4}')"
-    if ((available_kb < 30 * 1024 * 1024)); then
-      die "At least 30 GiB free space is required under ${DATA_ROOT}."
+    required_free_gib=30
+    if ((SKIP_MODELS)); then
+      required_free_gib=5
+    fi
+    if ((available_kb < required_free_gib * 1024 * 1024)); then
+      die "At least ${required_free_gib} GiB free space is required under ${DATA_ROOT}."
     fi
   fi
 }
