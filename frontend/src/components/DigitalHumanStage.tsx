@@ -33,6 +33,20 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
   const [mediaAspectRatio, setMediaAspectRatio] = useState(9 / 16);
   const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
   const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE;
+  const visualState =
+    avatar.connectionState === "failed"
+      ? "error"
+      : avatar.connectionState === "connected"
+        ? state
+        : "connecting";
+  const statusLabel =
+    avatar.connectionState === "disconnected"
+      ? "等待连接数字人"
+      : avatar.connectionState === "connecting"
+        ? "正在连接数字人"
+        : avatar.connectionState === "failed"
+          ? "数字人连接异常"
+          : stateLabels[state];
 
   const updateAspectRatio = (width: number, height: number) => {
     if (width > 0 && height > 0) setMediaAspectRatio(width / height);
@@ -77,7 +91,7 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
       data-orientation={orientation}
       style={stageStyle}
     >
-      <div className={`avatar-video-shell state-${state}`}>
+      <div className={`avatar-video-shell state-${visualState}`}>
         <video
           className="avatar-live-video"
           ref={videoRef}
@@ -136,8 +150,8 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
         )}
       </div>
       <div className="stage-status">
-        <span className={`status-dot state-${state}`} />
-        <strong>{stateLabels[state]}</strong>
+        <span className={`status-dot state-${visualState}`} />
+        <strong>{statusLabel}</strong>
         {avatar.connectionState === "connected" && (
           <>
             <span className="avatar-session">数字人媒体已连接</span>
