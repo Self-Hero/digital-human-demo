@@ -16,6 +16,16 @@ SPEC.loader.exec_module(MODULE)
 MouthTemporalStabilizer = MODULE.MouthTemporalStabilizer
 
 
+def test_verified_realtime_profile_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("LIVETALKING_MOUTH_MOTION_THRESHOLD", raising=False)
+    monkeypatch.delenv("LIVETALKING_MOUTH_TRANSITION_FRAMES", raising=False)
+
+    stabilizer = MouthTemporalStabilizer()
+
+    assert stabilizer.motion_threshold == 0.15
+    assert stabilizer.transition_frames == 4
+
+
 def test_local_compositor_preserves_face_outside_mouth(monkeypatch) -> None:
     monkeypatch.setenv("LIVETALKING_MOUTH_LOCAL_COMPOSITOR", "1")
     monkeypatch.setenv("LIVETALKING_MOUTH_STABILIZER", "0")

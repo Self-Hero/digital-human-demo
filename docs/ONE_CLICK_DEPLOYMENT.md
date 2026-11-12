@@ -92,6 +92,7 @@ bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 `LIVETALKING_MOUTH_STABILIZER`、`LIVETALKING_MOUTH_STRENGTH` 和
 `LIVETALKING_MOUTH_MOTION_THRESHOLD` 调整或关闭。昂贵的光流对齐默认关闭；
 只有明确设置 `LIVETALKING_MOUTH_OPTICAL_FLOW=1` 才会启用。
+已验证的实时配置使用 motion threshold `0.15` 和 transition frames `4`。
 
 默认同时启用 `LIVETALKING_MOUTH_ADAPTIVE=1`：口腔和牙齿中心只做极弱的静态
 去闪，唇线与嘴部外围承担主要时序稳定；局部运动突然增加时会立即降低上一帧权重，

@@ -68,13 +68,13 @@ class MouthTemporalStabilizer:
             "LIVETALKING_MOUTH_STRENGTH", 0.22, 0.0, 0.35
         )
         self.motion_threshold = _env_float(
-            "LIVETALKING_MOUTH_MOTION_THRESHOLD", 0.12, 0.02, 0.5
+            "LIVETALKING_MOUTH_MOTION_THRESHOLD", 0.15, 0.02, 0.5
         )
         self.reset_gap_seconds = _env_float(
             "LIVETALKING_MOUTH_RESET_GAP_SECONDS", 0.75, 0.2, 5.0
         )
         self.transition_frames = int(
-            _env_float("LIVETALKING_MOUTH_TRANSITION_FRAMES", 3, 0, 12)
+            _env_float("LIVETALKING_MOUTH_TRANSITION_FRAMES", 4, 0, 12)
         )
         self._previous: np.ndarray | None = None
         self._last_frame_at = 0.0
