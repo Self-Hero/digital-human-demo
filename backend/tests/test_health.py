@@ -13,6 +13,47 @@ def test_health_reports_mock_providers() -> None:
     assert payload["status"] == "ok"
     assert payload["providers"]["realtime"] == "doubao"
     assert payload["providers"]["avatar"] == "mock"
+    assert payload["activeSessions"] == 0
+
+
+def test_ready_reports_dependencies(monkeypatch) -> None:
+    async def ready_livetalking() -> tuple[bool, str | None]:
+        return True, None
+
+    monkeypatch.setattr(
+        "app.api.routes.health._livetalking_ready", ready_livetalking
+    )
+    monkeypatch.setattr(
+        "app.api.routes.health._missing_realtime_settings", lambda: []
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/ready")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+
+
+def test_ready_reports_missing_configuration(monkeypatch) -> None:
+    async def unavailable_livetalking() -> tuple[bool, str | None]:
+        return False, "connection refused"
+
+    monkeypatch.setattr(
+        "app.api.routes.health._livetalking_ready", unavailable_livetalking
+    )
+    monkeypatch.setattr(
+        "app.api.routes.health._missing_realtime_settings",
+        lambda: ["DOUBAO_APP_ID"],
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/ready")
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "not_ready"
+    assert payload["missingSettings"] == ["DOUBAO_APP_ID"]
+    assert payload["livetalking"]["ready"] is False
 
 
 def test_bailian_realtime_defaults() -> None:

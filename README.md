@@ -26,6 +26,15 @@ bash deploy/install_full_stack.sh \
 `--enable-gfpgan` 启用单路 RTX 4090 实时配置，包括进程级模型预热、隔帧修复、
 逐帧残差插值和嘴部残差保护；省略时仍安装运行时，但默认关闭 GFPGAN。
 
+运行状态可用一条命令检查：
+
+```bash
+bash deploy/doctor.sh ma_renda_dynamic
+```
+
+单路 WebRTC 会话在异常断开后会自动回收；前端会在后端重启后创建新会话。嘴部
+时序稳定默认按口腔中心、唇线和外围接缝分区处理，减少抖动时不压慢快速口型。
+
 安装完成后，单独处理人物素材并启动 LiveTalking：
 
 ```bash

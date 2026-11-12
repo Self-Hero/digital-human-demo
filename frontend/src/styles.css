@@ -163,7 +163,7 @@ h2 {
   opacity: 1;
   pointer-events: none;
   user-select: none;
-  transition: opacity 120ms ease-out;
+  transition: opacity 60ms ease-out;
   will-change: opacity;
 }
 
@@ -228,6 +228,18 @@ h2 {
 .avatar-session {
   color: #78ddb9;
   font-size: 0.84rem;
+}
+
+.disconnect-button {
+  padding: 4px 8px;
+  border: 0;
+  color: #8fa8c4;
+  background: transparent;
+  font-size: 0.82rem;
+}
+
+.disconnect-button:hover {
+  color: #dceaff;
 }
 
 .avatar-face {

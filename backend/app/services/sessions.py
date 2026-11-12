@@ -27,6 +27,10 @@ class SessionManager:
     def get(self, session_id: str) -> SessionRuntime | None:
         return self._sessions.get(session_id)
 
+    @property
+    def active_count(self) -> int:
+        return len(self._sessions)
+
     async def interrupt(self, session: SessionRuntime) -> None:
         task = session.current_task
         if task and not task.done():

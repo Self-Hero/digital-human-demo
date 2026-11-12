@@ -64,3 +64,36 @@ def test_local_compositor_can_be_disabled(monkeypatch) -> None:
     )
 
     assert np.array_equal(result, generated)
+
+
+def test_adaptive_temporal_mask_protects_inner_mouth(monkeypatch) -> None:
+    monkeypatch.setenv("LIVETALKING_MOUTH_ADAPTIVE", "1")
+    monkeypatch.setenv("LIVETALKING_MOUTH_INNER_STRENGTH", "0.08")
+
+    stabilizer = MouthTemporalStabilizer()
+    mask = stabilizer._adaptive_temporal_mask(80, 100)[..., 0]
+
+    inner_mouth = float(mask[38, 50])
+    lip_boundary = float(mask[38, 20])
+    assert inner_mouth < 0.2
+    assert lip_boundary > 0.65
+
+
+def test_adaptive_motion_reacts_fast_and_releases_slowly(monkeypatch) -> None:
+    monkeypatch.setenv("LIVETALKING_MOUTH_STABILIZER", "1")
+    monkeypatch.setenv("LIVETALKING_MOUTH_ADAPTIVE", "1")
+    monkeypatch.setenv("LIVETALKING_MOUTH_STRENGTH", "0.30")
+
+    stabilizer = MouthTemporalStabilizer()
+    first = np.full((96, 96, 3), 80, dtype=np.uint8)
+    moving = first.copy()
+    moving[56:72, 38:58] = 180
+    bbox = (16, 8, 80, 88)
+
+    stabilizer.apply(first.copy(), bbox)
+    stabilizer.apply(moving.copy(), bbox)
+    high_motion = stabilizer._motion_ema.copy()
+    stabilizer.apply(moving.copy(), bbox)
+
+    assert float(stabilizer._motion_ema.mean()) < float(high_motion.mean())
+    assert float(stabilizer._motion_ema.mean()) > 0.0

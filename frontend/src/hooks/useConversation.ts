@@ -124,13 +124,28 @@ export function useConversation(
   }, []);
 
   useEffect(() => {
+    if (!avatarMediaConnected) {
+      setState("connecting");
+      return;
+    }
+
     let disposed = false;
     let reconnectTimer: number | null = null;
     let reconnectAttempt = 0;
 
-    async function connect(existingSessionId?: string) {
+    function scheduleReconnect() {
+      if (disposed || reconnectTimer !== null) return;
+      const delay = Math.min(1_000 * 2 ** reconnectAttempt, 10_000);
+      reconnectAttempt += 1;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        void connect();
+      }, delay);
+    }
+
+    async function connect() {
       try {
-        const sessionId = existingSessionId ?? (await createSession());
+        const sessionId = await createSession();
         if (disposed) {
           await deleteSession(sessionId);
           return;
@@ -214,6 +229,7 @@ export function useConversation(
             return;
           }
           if (event.type === "error") {
+            releaseMicrophone();
             setError(event.message ?? "实时语音发生未知错误");
             setState("error");
           }
@@ -226,13 +242,13 @@ export function useConversation(
         socket.onclose = () => {
           if (disposed || socketRef.current !== socket) return;
           socketRef.current = null;
+          releaseMicrophone();
+          if (sessionIdRef.current === sessionId) {
+            sessionIdRef.current = null;
+          }
+          void deleteSession(sessionId).catch(() => undefined);
           setState("connecting");
-          const delay = Math.min(1_000 * 2 ** reconnectAttempt, 10_000);
-          reconnectAttempt += 1;
-          reconnectTimer = window.setTimeout(() => {
-            reconnectTimer = null;
-            void connect(sessionId);
-          }, delay);
+          scheduleReconnect();
         };
       } catch (connectionError) {
         setError(
@@ -241,6 +257,7 @@ export function useConversation(
             : "连接后端失败",
         );
         setState("error");
+        scheduleReconnect();
       }
     }
 
@@ -253,9 +270,12 @@ export function useConversation(
       socketRef.current?.close();
       void audioContextRef.current?.close();
       const sessionId = sessionIdRef.current;
-      if (sessionId) void deleteSession(sessionId);
+      sessionIdRef.current = null;
+      if (sessionId) {
+        void deleteSession(sessionId, true).catch(() => undefined);
+      }
     };
-  }, [clearPlayback, playPcm16, releaseMicrophone]);
+  }, [avatarMediaConnected, clearPlayback, playPcm16, releaseMicrophone]);
 
   useEffect(() => {
     avatarSessionIdRef.current = avatarSessionId;

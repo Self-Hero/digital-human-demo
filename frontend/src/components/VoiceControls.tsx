@@ -23,7 +23,7 @@ export function VoiceControls({
           type="button"
           aria-pressed={microphoneActive}
           onClick={() => void onToggleMicrophone()}
-          disabled={state === "connecting"}
+          disabled={state === "connecting" || state === "error"}
         >
           <span className="microphone-indicator" aria-hidden="true" />
           {microphoneActive ? "关闭麦克风" : "开启麦克风"}

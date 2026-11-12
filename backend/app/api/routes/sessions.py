@@ -34,8 +34,12 @@ async def session_realtime(websocket: WebSocket, session_id: str) -> None:
         bridge = create_realtime_bridge(get_settings())
     except ValueError as exc:
         await websocket.send_json({"type": "error", "message": str(exc)})
+        await container.sessions.remove(session_id)
         return
-    await bridge.run(websocket)
+    try:
+        await bridge.run(websocket)
+    finally:
+        await container.sessions.remove(session_id)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

@@ -273,6 +273,12 @@ verify_deployment() {
   [[ -x "${LIVETALKING_PY}" ]] || die "LiveTalking Conda environment is missing."
   [[ -x "${BACKEND_UVICORN}" ]] || die "Backend virtual environment is missing."
   require_file "${LIVETALKING_DIR}/server/pcm_stream.py"
+  grep -qF "Connection remained disconnected; reclaiming session" \
+    "${LIVETALKING_DIR}/server/rtc_manager.py" || \
+    die "LiveTalking session cleanup patch is missing."
+  grep -qF 'add_delete("/session/{sessionid}", close_session)' \
+    "${LIVETALKING_DIR}/app.py" || \
+    die "LiveTalking explicit session close route is missing."
   require_file "${LIVETALKING_DIR}/avatars/mouth_stabilizer.py"
   require_file "${LIVETALKING_DIR}/avatars/gfpgan_enhancer.py"
 
@@ -502,6 +508,9 @@ cp "${PROJECT_DIR}/deploy/livetalking_gfpgan.py" \
   "${PROJECT_DIR}/backend/scripts/configure_livetalking_mouth_stabilizer.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" \
+  "${PROJECT_DIR}/backend/scripts/configure_livetalking_session_cleanup.py" \
+  --livetalking-dir "${LIVETALKING_DIR}"
+"${BACKEND_PY}" \
   "${PROJECT_DIR}/backend/scripts/configure_livetalking_gfpgan.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" "${PROJECT_DIR}/backend/scripts/configure_livetalking_video.py" \
@@ -553,6 +562,8 @@ Environment=TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 Environment=TORCH_HOME=${TORCH_HOME}
 Environment=LIVETALKING_PCM_PREBUFFER_MS=200
 Environment=LIVETALKING_MOUTH_STABILIZER=1
+Environment=LIVETALKING_MOUTH_ADAPTIVE=1
+Environment=LIVETALKING_MOUTH_INNER_STRENGTH=0.08
 Environment=LIVETALKING_MOUTH_LOCAL_COMPOSITOR=1
 Environment=LIVETALKING_MOUTH_COLOR_MATCH=0.35
 Environment=LIVETALKING_MOUTH_SHARPEN=0.18

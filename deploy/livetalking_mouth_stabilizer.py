@@ -58,6 +58,12 @@ class MouthTemporalStabilizer:
         self.optical_flow = _env_enabled(
             "LIVETALKING_MOUTH_OPTICAL_FLOW", "0"
         )
+        self.adaptive = _env_enabled(
+            "LIVETALKING_MOUTH_ADAPTIVE", "1"
+        )
+        self.inner_mouth_strength = _env_float(
+            "LIVETALKING_MOUTH_INNER_STRENGTH", 0.08, 0.0, 0.4
+        )
         self.strength = _env_float(
             "LIVETALKING_MOUTH_STRENGTH", 0.22, 0.0, 0.35
         )
@@ -73,12 +79,15 @@ class MouthTemporalStabilizer:
         self._previous: np.ndarray | None = None
         self._last_frame_at = 0.0
         self._transition_index = 0
+        self._motion_ema: np.ndarray | None = None
         self._mask_cache: dict[tuple[int, int], np.ndarray] = {}
+        self._adaptive_mask_cache: dict[tuple[int, int], np.ndarray] = {}
         self._face_mask_cache: dict[tuple[int, int], np.ndarray] = {}
         logger.info(
             "MuseTalk mouth compositor: local=%s color_match=%.3f "
             "sharpen=%.3f mask=(cy=%.3f rx=%.3f ry=%.3f feather=%.3f) "
-            "temporal=%s optical_flow=%s strength=%.3f threshold=%.3f transition_frames=%d",
+            "temporal=%s adaptive=%s inner_strength=%.3f optical_flow=%s "
+            "strength=%.3f threshold=%.3f transition_frames=%d",
             self.local_compositor,
             self.color_match_strength,
             self.sharpen_strength,
@@ -87,6 +96,8 @@ class MouthTemporalStabilizer:
             self.local_mask_radius_y,
             self.local_mask_feather,
             self.enabled,
+            self.adaptive,
+            self.inner_mouth_strength,
             self.optical_flow,
             self.strength,
             self.motion_threshold,
@@ -97,6 +108,7 @@ class MouthTemporalStabilizer:
         self._previous = None
         self._last_frame_at = 0.0
         self._transition_index = 0
+        self._motion_ema = None
 
     def apply(
         self,
@@ -124,6 +136,7 @@ class MouthTemporalStabilizer:
         if now - self._last_frame_at > self.reset_gap_seconds:
             self._previous = None
             self._transition_index = 0
+            self._motion_ema = None
         self._last_frame_at = now
 
         if self._previous is None:
@@ -144,34 +157,65 @@ class MouthTemporalStabilizer:
         )
         current_gray = cv2.cvtColor(current, cv2.COLOR_BGR2GRAY)
         previous_gray = cv2.cvtColor(aligned_previous, cv2.COLOR_BGR2GRAY)
-        motion = float(
-            np.mean(
-                np.abs(
-                    current_gray.astype(np.float32)
-                    - previous_gray.astype(np.float32)
-                )
+        motion_map = (
+            np.abs(
+                current_gray.astype(np.float32)
+                - previous_gray.astype(np.float32)
             )
             / 255.0
         )
-        weight = self.strength * max(
-            0.0, 1.0 - motion / self.motion_threshold
-        )
-
-        if weight > 0.001:
-            blended = cv2.addWeighted(
-                current,
-                1.0 - weight,
-                aligned_previous,
-                weight,
+        if self.adaptive:
+            motion_map = cv2.GaussianBlur(motion_map, (0, 0), 1.0)
+            if (
+                self._motion_ema is None
+                or self._motion_ema.shape != motion_map.shape
+            ):
+                self._motion_ema = motion_map
+            else:
+                # React quickly to new lip motion, then release slowly so the
+                # stabilizer does not flicker on and off near the threshold.
+                rising = motion_map >= self._motion_ema
+                self._motion_ema = np.where(
+                    rising,
+                    self._motion_ema * 0.20 + motion_map * 0.80,
+                    self._motion_ema * 0.78 + motion_map * 0.22,
+                )
+            motion_gain = np.clip(
+                1.0 - self._motion_ema / self.motion_threshold,
                 0.0,
+                1.0,
             )
-            mask = self._soft_mask(current.shape[0], current.shape[1])
+            weight_map = (
+                self.strength
+                * motion_gain
+                * self._adaptive_temporal_mask(
+                    current.shape[0], current.shape[1]
+                )[..., 0]
+            )
             result = (
-                current.astype(np.float32) * (1.0 - mask)
-                + blended.astype(np.float32) * mask
+                current.astype(np.float32) * (1.0 - weight_map[..., None])
+                + aligned_previous.astype(np.float32) * weight_map[..., None]
             ).clip(0, 255).astype(np.uint8)
         else:
-            result = current
+            motion = float(np.mean(motion_map))
+            weight = self.strength * max(
+                0.0, 1.0 - motion / self.motion_threshold
+            )
+            if weight <= 0.001:
+                result = current
+            else:
+                blended = cv2.addWeighted(
+                    current,
+                    1.0 - weight,
+                    aligned_previous,
+                    weight,
+                    0.0,
+                )
+                mask = self._soft_mask(current.shape[0], current.shape[1])
+                result = (
+                    current.astype(np.float32) * (1.0 - mask)
+                    + blended.astype(np.float32) * mask
+                ).clip(0, 255).astype(np.uint8)
 
         result = self._blend_entry(result, reference_frame, roi_box)
         frame[y1:y2, x1:x2] = result
@@ -288,7 +332,11 @@ class MouthTemporalStabilizer:
             generated_weight,
             0.0,
         )
-        mask = self._soft_mask(generated.shape[0], generated.shape[1])
+        mask = (
+            self._adaptive_temporal_mask(generated.shape[0], generated.shape[1])
+            if self.adaptive
+            else self._soft_mask(generated.shape[0], generated.shape[1])
+        )
         return (
             generated.astype(np.float32) * (1.0 - mask)
             + blended.astype(np.float32) * mask
@@ -373,6 +421,33 @@ class MouthTemporalStabilizer:
         mask = mask[..., None]
         self._mask_cache[key] = mask
         return mask
+
+    def _adaptive_temporal_mask(self, height: int, width: int) -> np.ndarray:
+        key = (height, width)
+        cached = self._adaptive_mask_cache.get(key)
+        if cached is not None:
+            return cached
+
+        outer = self._soft_mask(height, width)[..., 0]
+        inner = np.zeros((height, width), dtype=np.float32)
+        cv2.ellipse(
+            inner,
+            (width // 2, int(height * 0.48)),
+            (max(1, int(width * 0.24)), max(1, int(height * 0.18))),
+            0,
+            0,
+            360,
+            1.0,
+            -1,
+        )
+        sigma = max(1.0, min(height, width) * 0.055)
+        inner = cv2.GaussianBlur(inner, (0, 0), sigma)
+        mask = outer * (
+            1.0 - inner * (1.0 - self.inner_mouth_strength)
+        )
+        cached = np.clip(mask, 0.0, 1.0)[..., None]
+        self._adaptive_mask_cache[key] = cached
+        return cached
 
     def _local_face_mask(self, height: int, width: int) -> np.ndarray:
         key = (height, width)

@@ -12,8 +12,14 @@ export async function createSession(): Promise<string> {
   return payload.sessionId;
 }
 
-export async function deleteSession(sessionId: string): Promise<void> {
-  await fetch(`${apiBaseUrl}/sessions/${sessionId}`, { method: "DELETE" });
+export async function deleteSession(
+  sessionId: string,
+  keepalive = false,
+): Promise<void> {
+  await fetch(`${apiBaseUrl}/sessions/${sessionId}`, {
+    method: "DELETE",
+    keepalive,
+  });
 }
 
 export function sessionWebSocketUrl(sessionId: string): string {

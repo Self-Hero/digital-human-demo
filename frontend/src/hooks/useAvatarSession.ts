@@ -24,10 +24,20 @@ function avatarPlaybackStatus(data: string): "start" | "end" | null {
       : null;
 }
 
+function releaseAvatarSession(sessionId: string | null): void {
+  if (!sessionId) return;
+  void fetch(`/avatar-api/session/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 export function useAvatarSession() {
   const peerRef = useRef<RTCPeerConnection | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const idleTimerRef = useRef<number | null>(null);
+  const disconnectTimerRef = useRef<number | null>(null);
   const [connectionState, setConnectionState] =
     useState<AvatarConnectionState>("disconnected");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -46,21 +56,33 @@ export function useAvatarSession() {
     setPlaybackSpeaking(false);
   }, []);
 
+  const clearDisconnectTimer = useCallback(() => {
+    if (disconnectTimerRef.current !== null) {
+      window.clearTimeout(disconnectTimerRef.current);
+      disconnectTimerRef.current = null;
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
+    clearDisconnectTimer();
     stopPlaybackEvents();
     const peer = peerRef.current;
     peerRef.current = null;
     peer?.close();
+    releaseAvatarSession(sessionIdRef.current);
+    sessionIdRef.current = null;
     videoStream?.getTracks().forEach((track) => track.stop());
     audioStream?.getTracks().forEach((track) => track.stop());
     setVideoStream(null);
     setAudioStream(null);
     setSessionId(null);
     setConnectionState("disconnected");
-  }, [audioStream, stopPlaybackEvents, videoStream]);
+  }, [audioStream, clearDisconnectTimer, stopPlaybackEvents, videoStream]);
 
   const connect = useCallback(async () => {
-    if (peerRef.current) return;
+    if (peerRef.current) {
+      disconnect();
+    }
 
     setConnectionState("connecting");
     setError(null);
@@ -90,9 +112,43 @@ export function useAvatarSession() {
       if (event.track.kind === "audio") setAudioStream(stream);
     });
     peer.addEventListener("connectionstatechange", () => {
-      if (peer.connectionState === "connected") setConnectionState("connected");
-      if (["failed", "disconnected"].includes(peer.connectionState)) {
+      if (peer.connectionState === "connected") {
+        clearDisconnectTimer();
+        setConnectionState("connected");
+      }
+      if (peer.connectionState === "disconnected") {
+        clearDisconnectTimer();
+        disconnectTimerRef.current = window.setTimeout(() => {
+          disconnectTimerRef.current = null;
+          if (peer.connectionState === "disconnected" && peerRef.current === peer) {
+            peerRef.current = null;
+            peer.close();
+            releaseAvatarSession(sessionIdRef.current);
+            sessionIdRef.current = null;
+            stopPlaybackEvents();
+            setSessionId(null);
+            setVideoStream(null);
+            setAudioStream(null);
+            setConnectionState("failed");
+            setError("数字人连接已断开，请重新连接");
+          }
+        }, 5_000);
+      }
+      if (
+        peer.connectionState === "failed" ||
+        (peer.connectionState === "closed" && peerRef.current === peer)
+      ) {
+        clearDisconnectTimer();
+        if (peerRef.current === peer) peerRef.current = null;
+        peer.close();
+        releaseAvatarSession(sessionIdRef.current);
+        sessionIdRef.current = null;
+        stopPlaybackEvents();
+        setSessionId(null);
+        setVideoStream(null);
+        setAudioStream(null);
         setConnectionState("failed");
+        setError("数字人连接失败，请重新连接");
       }
     });
 
@@ -122,14 +178,15 @@ export function useAvatarSession() {
           avatar: import.meta.env.VITE_AVATAR_ID ?? "ma_renda_dynamic",
         }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
       const answer = (await response.json()) as {
         sdp?: string;
         type?: RTCSdpType;
         sessionid?: string | number;
         msg?: string;
       };
+      if (!response.ok) {
+        throw new Error(answer.msg ?? `HTTP ${response.status}`);
+      }
       if (!answer.sdp || !answer.type) {
         throw new Error(answer.msg ?? "LiveTalking 未返回 SDP");
       }
@@ -137,6 +194,7 @@ export function useAvatarSession() {
       await peer.setRemoteDescription({ type: answer.type, sdp: answer.sdp });
       const nextSessionId =
         answer.sessionid == null ? null : String(answer.sessionid);
+      sessionIdRef.current = nextSessionId;
       setSessionId(nextSessionId);
 
       stopPlaybackEvents();
@@ -164,19 +222,30 @@ export function useAvatarSession() {
         }
       };
     } catch (cause) {
+      clearDisconnectTimer();
       peer.close();
       peerRef.current = null;
+      releaseAvatarSession(sessionIdRef.current);
+      sessionIdRef.current = null;
       setConnectionState("failed");
-      setError(cause instanceof Error ? cause.message : "数字人连接失败");
+      const message = cause instanceof Error ? cause.message : "数字人连接失败";
+      setError(
+        message.includes("Maximum session limit reached")
+          ? "数字人正在被另一个页面使用，请关闭其他页面后重试"
+          : message,
+      );
     }
-  }, [stopPlaybackEvents]);
+  }, [clearDisconnectTimer, disconnect, stopPlaybackEvents]);
 
   useEffect(
     () => () => {
       stopPlaybackEvents();
+      clearDisconnectTimer();
       peerRef.current?.close();
+      releaseAvatarSession(sessionIdRef.current);
+      sessionIdRef.current = null;
     },
-    [stopPlaybackEvents],
+    [clearDisconnectTimer, stopPlaybackEvents],
   );
 
   return {

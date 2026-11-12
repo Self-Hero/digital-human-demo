@@ -93,6 +93,11 @@ bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 `LIVETALKING_MOUTH_MOTION_THRESHOLD` 调整或关闭。昂贵的光流对齐默认关闭；
 只有明确设置 `LIVETALKING_MOUTH_OPTICAL_FLOW=1` 才会启用。
 
+默认同时启用 `LIVETALKING_MOUTH_ADAPTIVE=1`：口腔和牙齿中心只做极弱的静态
+去闪，唇线与嘴部外围承担主要时序稳定；局部运动突然增加时会立即降低上一帧权重，
+运动结束后缓慢恢复稳定，避免在阈值附近反复开关。该处理仍不使用未来帧，也不会
+增加音画等待时间。`LIVETALKING_MOUTH_INNER_STRENGTH` 默认值为 `0.08`。
+
 GFPGAN 实时修复运行时会随完整部署安装，但未传 `--enable-gfpgan` 时默认关闭，
 不加载模型也不占用显存。
 设置 `LIVETALKING_GFPGAN=1` 后重启对应头像服务即可启用。实时路径直接处理
@@ -139,11 +144,22 @@ Environment=LIVETALKING_MOUTH_STRENGTH=0.10
 ```bash
 bash deploy/bootstrap_server.sh --verify-only
 
+bash deploy/doctor.sh ma_renda_dynamic
+
 sudo systemctl status digital-human-backend
 sudo systemctl status livetalking@ma_renda_dynamic
 sudo journalctl -u digital-human-backend -f
 sudo journalctl -u livetalking@ma_renda_dynamic -f
 ```
+
+LiveTalking 的单路 WebRTC 会话在 `disconnected` 持续 5 秒后会自动回收；
+`failed` 和 `closed` 会立即回收。这样浏览器刷新、断网或异常退出不会长期占用
+`--max_session 1`。前端在后端重启或旧会话失效后会创建新会话，而不是持续重试
+已经不存在的 session ID。
+
+`/api/v1/health` 只检查 FastAPI 进程；`/api/v1/ready` 还会检查 Realtime 凭证和
+LiveTalking 可访问性。`deploy/doctor.sh` 汇总这两个接口、systemd、GPU、监听端口、
+最近 FPS/GFPGAN 指标和错误，适合作为第一条排障命令。
 
 公网页面默认为 `http://36.103.177.214:9000/`。普通公网 HTTP 通常无法获得浏览器麦克风权限；
 完整语音联调仍需域名和可信 HTTPS。TURN 默认不部署，前后端使用 STUN；复杂网络下 ICE

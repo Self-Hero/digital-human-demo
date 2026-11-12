@@ -93,7 +93,9 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
         />
         {idleImage && (
           <img
-            className={`avatar-idle-image${avatar.playbackSpeaking ? " is-hidden" : ""}`}
+            className={`avatar-idle-image${
+              avatar.playbackSpeaking || state === "speaking" ? " is-hidden" : ""
+            }`}
             src={idleImage}
             alt=""
             aria-hidden="true"
@@ -137,7 +139,16 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
         <span className={`status-dot state-${state}`} />
         <strong>{stateLabels[state]}</strong>
         {avatar.connectionState === "connected" && (
-          <span className="avatar-session">数字人媒体已连接</span>
+          <>
+            <span className="avatar-session">数字人媒体已连接</span>
+            <button
+              className="disconnect-button"
+              type="button"
+              onClick={avatar.disconnect}
+            >
+              断开
+            </button>
+          </>
         )}
         {metrics && (
           <span className="metrics">
