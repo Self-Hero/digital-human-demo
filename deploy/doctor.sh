@@ -19,18 +19,31 @@ service_state() {
   printf '%-36s %s\n' "${unit}" "$(systemctl is-active "${unit}" 2>/dev/null || true)"
 }
 
+http_check() {
+  curl --silent --show-error --max-time 3 "$1" || true
+  printf '\n'
+}
+
+wait_for_backend() {
+  local attempt
+  for attempt in {1..10}; do
+    if curl --silent --max-time 1 \
+      http://127.0.0.1:8001/api/v1/health >/dev/null 2>&1; then
+      return
+    fi
+    sleep 1
+  done
+}
+
 section "Services"
 service_state nginx.service
 service_state digital-human-backend.service
 service_state "${AVATAR_UNIT}"
 
 section "HTTP checks"
-curl --silent --show-error --max-time 3 \
-  http://127.0.0.1:8001/api/v1/health || true
-printf '\n'
-curl --silent --show-error --max-time 3 \
-  http://127.0.0.1:8001/api/v1/ready || true
-printf '\n'
+wait_for_backend
+http_check http://127.0.0.1:8001/api/v1/health
+http_check http://127.0.0.1:8001/api/v1/ready
 
 section "GPU"
 nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu \
