@@ -44,7 +44,7 @@ def _missing_realtime_settings() -> list[str]:
 async def _livetalking_ready() -> tuple[bool, str | None]:
     settings = get_settings()
     try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
+        async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as client:
             response = await client.get(f"{settings.livetalking_base_url.rstrip('/')}/")
             response.raise_for_status()
     except httpx.HTTPError as exc:

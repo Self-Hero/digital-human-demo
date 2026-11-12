@@ -1,5 +1,8 @@
+import asyncio
+
 from fastapi.testclient import TestClient
 
+from app.api.routes import health as health_routes
 from app.core.config import Settings
 from app.main import app
 
@@ -32,6 +35,31 @@ def test_ready_reports_dependencies(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "ready"
+
+
+def test_livetalking_readiness_follows_redirects(monkeypatch) -> None:
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+    class FakeAsyncClient:
+        def __init__(self, *, timeout: float, follow_redirects: bool) -> None:
+            assert timeout == 2.0
+            assert follow_redirects is True
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def get(self, url: str) -> FakeResponse:
+            assert url.endswith("/")
+            return FakeResponse()
+
+    monkeypatch.setattr(health_routes.httpx, "AsyncClient", FakeAsyncClient)
+
+    assert asyncio.run(health_routes._livetalking_ready()) == (True, None)
 
 
 def test_ready_reports_missing_configuration(monkeypatch) -> None:
