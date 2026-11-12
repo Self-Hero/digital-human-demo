@@ -24,7 +24,6 @@ git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-huma
 cd /data/digital-human-demo
 bash deploy/install_full_stack.sh \
   --public-ip 36.103.177.214 --public-port 9000 \
-  --public-path fengyucai \
   --enable-gfpgan
 ```
 
@@ -37,8 +36,6 @@ batch 2、AMP、异步 CUDA 流、隔帧修复、嘴部保护残差插值、0.6 
 `9000`；云安全组必须放行 `9000/tcp`。其他平台可传入 `--public-port 80`。脚本默认使用清华 Miniconda/Conda/PyPI、
 Hugging Face 镜像和 npmmirror；PyTorch CUDA wheel 仍从 PyTorch 官方源下载。下载中断后
 直接执行同一条命令，pip/Hugging Face 缓存保存在 `/data/cache`，不会从头重复下载完整文件。
-`--public-path fengyucai` 把 Nginx 对外入口设为 `/fengyucai`，根地址会自动跳转到该入口；
-它不改变人物 ID、后端 API 或 LiveTalking WebRTC 代理路径。不传该参数时继续使用根路径。
 
 脚本会完成：
 
@@ -164,7 +161,7 @@ LiveTalking 的单路 WebRTC 会话在 `disconnected` 持续 5 秒后会自动�
 LiveTalking 可访问性。`deploy/doctor.sh` 汇总这两个接口、systemd、GPU、监听端口、
 最近 FPS/GFPGAN 指标和错误，适合作为第一条排障命令。
 
-按上面的部署命令，公网页面为 `http://36.103.177.214:9000/fengyucai`。普通公网 HTTP 通常无法获得浏览器麦克风权限；
+公网页面默认为 `http://36.103.177.214:9000/`。普通公网 HTTP 通常无法获得浏览器麦克风权限；
 完整语音联调仍需域名和可信 HTTPS。TURN 默认不部署，前后端使用 STUN；复杂网络下 ICE
 失败时再按 [PUBLIC_SERVER_DEPLOYMENT.md](PUBLIC_SERVER_DEPLOYMENT.md) 增加 TURN。
 

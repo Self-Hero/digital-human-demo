@@ -20,7 +20,6 @@ git clone https://github.com/Self-Hero/digital-human-demo.git /data/digital-huma
 cd /data/digital-human-demo
 bash deploy/install_full_stack.sh \
   --public-ip 36.103.177.214 --public-port 9000 \
-  --public-path fengyucai \
   --enable-gfpgan
 ```
 
@@ -44,9 +43,8 @@ bash deploy/start_avatar.sh \
   --avatar-id ma_renda_dynamic
 ```
 
-上面的公网页面访问地址是 `http://36.103.177.214:9000/fengyucai`，根地址会自动跳转到该入口。
-`--public-path` 只配置 Nginx 对外路径，不会改变人物 ID、API 或 WebRTC 地址；不传时仍使用根路径。
-云安全组需要放行 `9000/tcp`；其他云平台可通过 `--public-port 80` 改回标准 HTTP 端口。
+公网页面默认访问 `http://36.103.177.214:9000/`。云安全组需要放行
+`9000/tcp`；其他云平台可通过 `--public-port 80` 改回标准 HTTP 端口。
 
 后端本地启动：
 

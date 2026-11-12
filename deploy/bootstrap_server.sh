@@ -13,7 +13,6 @@ LIVETALKING_REF="${LIVETALKING_REF:-c7269433a2b6ecebcd9342445d2ecc882c98b0da}"
 GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 PUBLIC_IP="${PUBLIC_IP:-36.103.177.214}"
 PUBLIC_PORT="${PUBLIC_PORT:-9000}"
-PUBLIC_PATH="${PUBLIC_PATH:-}"
 STUN_URL="${STUN_URL:-stun:stun.freeswitch.org:3478}"
 HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 TORCH_HOME="${TORCH_HOME:-${DATA_ROOT}/cache/torch}"
@@ -48,7 +47,6 @@ and an Nginx public entrypoint on Ubuntu 22.04.
 Options:
   --public-ip IP             Public IPv4 used in CORS (default: 36.103.177.214)
   --public-port PORT         Nginx public HTTP port (default: 9000)
-  --public-path PATH         Public URL suffix, for example fengyucai
   --enable-gfpgan            Enable the RTX 4090 realtime GFPGAN profile
   --enable-silence-inference Apply the optional zero-audio MuseTalk patch
   --skip-apt                 Do not install Ubuntu packages
@@ -61,7 +59,7 @@ Environment overrides:
   DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, LIVETALKING_REPO_URL,
   LIVETALKING_REF, GITHUB_PROXY_PREFIX, HF_ENDPOINT, TORCH_HOME,
   PIP_INDEX_URL, PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL,
-  MINICONDA_INSTALLER_URL, STUN_URL, PUBLIC_PORT, PUBLIC_PATH
+  MINICONDA_INSTALLER_URL, STUN_URL, PUBLIC_PORT
 EOF
 }
 
@@ -140,7 +138,6 @@ while (($#)); do
   case "$1" in
     --public-ip) require_option_value "$1" "${2:-}"; PUBLIC_IP="$2"; shift 2 ;;
     --public-port) require_option_value "$1" "${2:-}"; PUBLIC_PORT="$2"; shift 2 ;;
-    --public-path) require_option_value "$1" "${2:-}"; PUBLIC_PATH="$2"; shift 2 ;;
     --enable-gfpgan)
       ENABLE_GFPGAN=1
       MUSETALK_BATCH_SIZE=8
@@ -163,16 +160,11 @@ done
 [[ "${PUBLIC_PORT}" =~ ^[0-9]+$ ]] || die "Public port must be numeric."
 ((PUBLIC_PORT >= 1 && PUBLIC_PORT <= 65535)) || \
   die "Public port must be between 1 and 65535."
-PUBLIC_PATH="${PUBLIC_PATH#/}"
-PUBLIC_PATH="${PUBLIC_PATH%/}"
-[[ -z "${PUBLIC_PATH}" || "${PUBLIC_PATH}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || \
-  die "Public path may contain only lowercase letters, numbers, and hyphens."
 if [[ "${PUBLIC_PORT}" == 80 ]]; then
   PUBLIC_ORIGIN="http://${PUBLIC_IP}"
 else
   PUBLIC_ORIGIN="http://${PUBLIC_IP}:${PUBLIC_PORT}"
 fi
-PUBLIC_PAGE="${PUBLIC_ORIGIN}${PUBLIC_PATH:+/${PUBLIC_PATH}}"
 
 if [[ "${EUID}" -eq 0 ]]; then
   DEPLOY_USER="${SUDO_USER:-root}"
@@ -599,14 +591,53 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-  proxy_args=(--public-port "${PUBLIC_PORT}")
-  if [[ -n "${PUBLIC_PATH}" ]]; then
-    proxy_args+=(--public-path "${PUBLIC_PATH}")
-  fi
-  bash "${PROJECT_DIR}/deploy/configure_public_proxy.sh" "${proxy_args[@]}"
+  "${SUDO[@]}" tee /etc/nginx/sites-available/digital-human >/dev/null <<EOF
+server {
+    listen ${PUBLIC_PORT} default_server;
+    listen [::]:${PUBLIC_PORT} default_server;
+    server_name _;
+    root ${PROJECT_DIR}/frontend/dist;
+    index index.html;
+    client_max_body_size 100m;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+    }
+
+    location /avatar-api/ {
+        rewrite ^/avatar-api/(.*)\$ /\$1 break;
+        proxy_pass http://127.0.0.1:8010;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+
+  "${SUDO[@]}" rm -f /etc/nginx/sites-enabled/default
+  "${SUDO[@]}" ln -sfn /etc/nginx/sites-available/digital-human \
+    /etc/nginx/sites-enabled/digital-human
+  "${SUDO[@]}" nginx -t
   "${SUDO[@]}" systemctl daemon-reload
   "${SUDO[@]}" systemctl enable digital-human-backend.service nginx
   "${SUDO[@]}" systemctl restart digital-human-backend.service
+  "${SUDO[@]}" systemctl reload-or-restart nginx
 
 fi
 
@@ -615,7 +646,7 @@ verify_deployment
 cat <<EOF
 
 Installation finished.
-Public page: ${PUBLIC_PAGE}
+Public page: ${PUBLIC_ORIGIN}/
 Backend env: ${PROJECT_DIR}/backend/.env
 LiveTalking: ${LIVETALKING_DIR}
 
