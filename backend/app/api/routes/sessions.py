@@ -1,7 +1,10 @@
 import asyncio
+import re
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
+from pydantic import BaseModel
 
 from app.container import container
 from app.core.config import Settings, get_settings
@@ -10,16 +13,22 @@ from app.providers.doubao_realtime import DoubaoRealtimeBridge
 from app.services.sessions import new_turn_id
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+
+
+class SessionCreateRequest(BaseModel):
+    clientId: str | None = None
 
 
 def create_realtime_bridge(
     settings: Settings,
+    on_activity: Callable[[bool], Awaitable[None]] | None = None,
 ) -> BailianRealtimeBridge | DoubaoRealtimeBridge:
     provider = settings.realtime_provider.strip().lower()
     if provider == "doubao":
-        return DoubaoRealtimeBridge(settings)
+        return DoubaoRealtimeBridge(settings, on_activity)
     if provider == "bailian":
-        return BailianRealtimeBridge(settings)
+        return BailianRealtimeBridge(settings, on_activity)
     raise ValueError(f"Unsupported realtime provider: {settings.realtime_provider}")
 
 
@@ -30,8 +39,14 @@ async def session_realtime(websocket: WebSocket, session_id: str) -> None:
         return
 
     await websocket.accept()
+
+    async def on_activity(active: bool) -> None:
+        session = container.sessions.get(session_id)
+        if session is not None and session.client_id:
+            await container.access.mark_activity(session.client_id, active)
+
     try:
-        bridge = create_realtime_bridge(get_settings())
+        bridge = create_realtime_bridge(get_settings(), on_activity)
     except ValueError as exc:
         await websocket.send_json({"type": "error", "message": str(exc)})
         await container.sessions.remove(session_id)
@@ -43,8 +58,13 @@ async def session_realtime(websocket: WebSocket, session_id: str) -> None:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_session() -> dict[str, str]:
-    session = await container.sessions.create()
+async def create_session(
+    request: SessionCreateRequest | None = None,
+) -> dict[str, str]:
+    client_id = request.clientId if request is not None else None
+    if client_id is not None and not CLIENT_ID_PATTERN.fullmatch(client_id):
+        raise HTTPException(status_code=400, detail="Invalid client id")
+    session = await container.sessions.create(client_id)
     return {"sessionId": session.session_id}
 
 

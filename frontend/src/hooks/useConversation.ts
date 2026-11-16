@@ -50,6 +50,7 @@ function downsampleToPcm16(input: Float32Array, inputRate: number): Uint8Array {
 export function useConversation(
   avatarSessionId: string | null,
   avatarMediaConnected: boolean,
+  clientId: string,
 ) {
   const socketRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -145,7 +146,7 @@ export function useConversation(
 
     async function connect() {
       try {
-        const sessionId = await createSession();
+        const sessionId = await createSession(clientId);
         if (disposed) {
           await deleteSession(sessionId);
           return;
@@ -275,7 +276,13 @@ export function useConversation(
         void deleteSession(sessionId, true).catch(() => undefined);
       }
     };
-  }, [avatarMediaConnected, clearPlayback, playPcm16, releaseMicrophone]);
+  }, [
+    avatarMediaConnected,
+    clientId,
+    clearPlayback,
+    playPcm16,
+    releaseMicrophone,
+  ]);
 
   useEffect(() => {
     avatarSessionIdRef.current = avatarSessionId;

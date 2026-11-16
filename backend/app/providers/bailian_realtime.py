@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import quote
 from uuid import uuid4
@@ -16,8 +17,17 @@ from app.providers.livetalking import LiveTalkingAudioSink
 class BailianRealtimeBridge:
     """Relay browser PCM audio to Bailian without exposing the API key."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        on_activity: Callable[[bool], Awaitable[None]] | None = None,
+    ) -> None:
         self._settings = settings
+        self._on_activity = on_activity
+
+    async def _notify_activity(self, active: bool) -> None:
+        if self._on_activity is not None:
+            await self._on_activity(active)
 
     async def run(self, browser: WebSocket) -> None:
         if not self._settings.bailian_api_key:
@@ -96,6 +106,10 @@ class BailianRealtimeBridge:
             except Exception:
                 pass
         finally:
+            try:
+                await self._notify_activity(False)
+            except Exception:
+                pass
             await audio_sink.close()
 
     async def _forward_browser(
@@ -119,6 +133,7 @@ class BailianRealtimeBridge:
                 await upstream.send(json.dumps({"type": "response.cancel"}))
                 await audio_sink.interrupt()
                 await send({"type": "playback.clear"})
+                await self._notify_activity(False)
                 await send({"type": "session.state", "state": "listening"})
             elif message_type == "avatar.session.attach":
                 session_id = str(message.get("sessionId", "")).strip()
@@ -135,9 +150,8 @@ class BailianRealtimeBridge:
         while True:
             yield await browser.receive_json()
 
-    @staticmethod
     async def _forward_upstream(
-        upstream: Any, send, audio_sink: LiveTalkingAudioSink | None = None
+        self, upstream: Any, send, audio_sink: LiveTalkingAudioSink | None = None
     ) -> None:
         speech_ended_at: float | None = None
         response_started_at: float | None = None
@@ -159,6 +173,7 @@ class BailianRealtimeBridge:
                 )
             elif event_type == "input_audio_buffer.speech_started":
                 await send({"type": "playback.clear"})
+                await self._notify_activity(True)
                 await send({"type": "session.state", "state": "listening"})
             elif event_type == "input_audio_buffer.speech_stopped":
                 speech_ended_at = time.perf_counter()
@@ -247,6 +262,7 @@ class BailianRealtimeBridge:
                         },
                     }
                 )
+                await self._notify_activity(False)
                 await send({"type": "session.state", "state": "idle"})
                 speech_ended_at = None
                 response_started_at = None

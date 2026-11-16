@@ -12,7 +12,7 @@ class ShortRealtimeBridge:
 def test_realtime_websocket_removes_session_when_bridge_finishes(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.api.routes.sessions.create_realtime_bridge",
-        lambda settings: ShortRealtimeBridge(),
+        lambda settings, on_activity=None: ShortRealtimeBridge(),
     )
 
     with TestClient(app) as client:

@@ -3,8 +3,12 @@ const apiBaseUrl = new URL(
   window.location.origin,
 ).toString().replace(/\/$/, "");
 
-export async function createSession(): Promise<string> {
-  const response = await fetch(`${apiBaseUrl}/sessions`, { method: "POST" });
+export async function createSession(clientId: string): Promise<string> {
+  const response = await fetch(`${apiBaseUrl}/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId }),
+  });
   if (!response.ok) {
     throw new Error(`创建会话失败：HTTP ${response.status}`);
   }
@@ -37,6 +41,9 @@ export function realtimeWebSocketUrl(sessionId: string): string {
 export interface ConversationAccessStatus {
   onlineClients: number;
   conversationActive: boolean;
+  conversationInProgress: boolean;
+  conversationReclaimable: boolean;
+  conversationInactiveSeconds: number;
   ownsConversation: boolean;
 }
 
@@ -50,12 +57,19 @@ export function presenceWebSocketUrl(clientId: string): string {
 
 async function accessRequest(
   clientId: string,
-  method: "POST" | "DELETE",
+  method: "POST" | "PUT" | "DELETE",
   keepalive = false,
+  suffix = "",
+  body?: unknown,
 ): Promise<ConversationAccessStatus> {
   const response = await fetch(
-    `${apiBaseUrl}/access/conversation/${encodeURIComponent(clientId)}`,
-    { method, keepalive },
+    `${apiBaseUrl}/access/conversation/${encodeURIComponent(clientId)}${suffix}`,
+    {
+      method,
+      keepalive,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
   );
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
@@ -77,4 +91,22 @@ export function releaseConversation(
   keepalive = false,
 ): Promise<ConversationAccessStatus> {
   return accessRequest(clientId, "DELETE", keepalive);
+}
+
+export function bindConversationAvatarSession(
+  clientId: string,
+  avatarSessionId: string,
+): Promise<ConversationAccessStatus> {
+  return accessRequest(
+    clientId,
+    "PUT",
+    false,
+    `/avatar/${encodeURIComponent(avatarSessionId)}`,
+  );
+}
+
+export function reclaimInactiveConversation(
+  clientId: string,
+): Promise<ConversationAccessStatus> {
+  return accessRequest(clientId, "POST", false, "/reclaim");
 }

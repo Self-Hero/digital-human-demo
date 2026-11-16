@@ -119,9 +119,14 @@ def test_binary_audio_response_is_decoded() -> None:
 
 def test_upstream_events_are_mapped_to_browser_and_livetalking() -> None:
     received: list[dict] = []
+    activity: list[bool] = []
     sink = FakeAudioSink()
     pcm = b"\x01\x00\x02\x00"
-    bridge = DoubaoRealtimeBridge(Settings(_env_file=None))
+
+    async def on_activity(active: bool) -> None:
+        activity.append(active)
+
+    bridge = DoubaoRealtimeBridge(Settings(_env_file=None), on_activity)
 
     async def send(event: dict) -> None:
         received.append(event)
@@ -146,6 +151,7 @@ def test_upstream_events_are_mapped_to_browser_and_livetalking() -> None:
     assert "assistant.done" in event_types
     assert "audio.delta" in event_types
     assert "turn.completed" in event_types
+    assert activity == [True, False]
     assert received[-1] == {"type": "session.state", "state": "idle"}
     audio_event = next(event for event in received if event["type"] == "audio.delta")
     assert base64.b64decode(audio_event["audio"]) == pcm

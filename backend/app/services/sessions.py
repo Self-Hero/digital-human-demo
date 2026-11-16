@@ -8,6 +8,7 @@ from app.providers.contracts import AvatarEngine
 @dataclass
 class SessionRuntime:
     session_id: str
+    client_id: str | None = None
     current_turn_id: str | None = None
     current_task: asyncio.Task[None] | None = None
     send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -18,8 +19,8 @@ class SessionManager:
         self._avatar = avatar
         self._sessions: dict[str, SessionRuntime] = {}
 
-    async def create(self) -> SessionRuntime:
-        session = SessionRuntime(session_id=str(uuid4()))
+    async def create(self, client_id: str | None = None) -> SessionRuntime:
+        session = SessionRuntime(session_id=str(uuid4()), client_id=client_id)
         self._sessions[session.session_id] = session
         await self._avatar.start(session.session_id)
         return session

@@ -175,6 +175,15 @@ h1, h2, p { margin-top: 0; }
   background: #1976c9;
 }
 .primary-button:hover:not(:disabled) { background: #1268b5; }
+.reclaim-button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #6f7b76;
+  border-radius: 6px;
+  color: #e5e9e7;
+  background: #29312e;
+}
+.reclaim-button:hover:not(:disabled) { background: #343e3a; }
 .audio-unlock-button {
   position: absolute;
   z-index: 4;

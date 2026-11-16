@@ -3,6 +3,7 @@ import base64
 import binascii
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from typing import Any
 from uuid import uuid4
@@ -26,8 +27,13 @@ logger = logging.getLogger(__name__)
 class DoubaoRealtimeBridge:
     """Bridge browser PCM to Doubao's legacy binary realtime dialogue API."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        on_activity: Callable[[bool], Awaitable[None]] | None = None,
+    ) -> None:
         self._settings = settings
+        self._on_activity = on_activity
         self._session_id = str(uuid4())
         self._upstream_send_lock = asyncio.Lock()
         self._suppress_audio = False
@@ -82,6 +88,10 @@ class DoubaoRealtimeBridge:
     async def _send_upstream(self, upstream: Any, frame: bytes) -> None:
         async with self._upstream_send_lock:
             await upstream.send(frame)
+
+    async def _notify_activity(self, active: bool) -> None:
+        if self._on_activity is not None:
+            await self._on_activity(active)
 
     async def _start_upstream_session(self, upstream: Any) -> None:
         await self._send_upstream(upstream, encode_json_request(1, {}))
@@ -179,6 +189,8 @@ class DoubaoRealtimeBridge:
             with suppress(Exception):
                 await send({"type": "error", "message": f"豆包实时连接失败：{exc}"})
         finally:
+            with suppress(Exception):
+                await self._notify_activity(False)
             await audio_sink.close()
 
     async def _forward_browser(
@@ -210,6 +222,7 @@ class DoubaoRealtimeBridge:
                 self._suppress_audio = True
                 await audio_sink.interrupt()
                 await send({"type": "playback.clear"})
+                await self._notify_activity(False)
                 await send({"type": "session.state", "state": "listening"})
             elif message_type == "avatar.session.attach":
                 session_id = str(message.get("sessionId", "")).strip()
@@ -278,6 +291,7 @@ class DoubaoRealtimeBridge:
             self._user_transcript = ""
             await audio_sink.interrupt()
             await send({"type": "playback.clear"})
+            await self._notify_activity(True)
             await send({"type": "session.state", "state": "listening"})
         elif 451 <= event < 459:
             text = self._extract_text(payload)
@@ -368,6 +382,7 @@ class DoubaoRealtimeBridge:
                 },
             }
         )
+        await self._notify_activity(False)
         await send(
             {
                 "type": "session.state",

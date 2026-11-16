@@ -13,6 +13,7 @@ export default function App() {
   const conversation = useConversation(
     avatar.sessionId,
     avatar.connectionState === "connected",
+    access.clientId,
   );
   const { acquire, release } = access;
   const { connect, disconnect } = avatar;
@@ -28,20 +29,35 @@ export default function App() {
   }, [disconnect, release]);
 
   const toggleMicrophone = useCallback(async () => {
-    const wasActive = conversation.microphoneActive;
-    const isActive = await conversation.toggleMicrophone();
-    if (wasActive || !isActive) disconnectAvatar();
-  }, [
-    conversation.microphoneActive,
-    conversation.toggleMicrophone,
-    disconnectAvatar,
-  ]);
+    await conversation.toggleMicrophone();
+  }, [conversation.toggleMicrophone]);
 
   useEffect(() => {
     if (avatar.connectionState === "failed" && access.ownsConversation) {
       void release();
     }
   }, [access.ownsConversation, avatar.connectionState, release]);
+
+  useEffect(() => {
+    if (access.ownsConversation && avatar.sessionId) {
+      void access.bindAvatarSession(avatar.sessionId);
+    }
+  }, [access.bindAvatarSession, access.ownsConversation, avatar.sessionId]);
+
+  useEffect(() => {
+    if (
+      access.presenceReady &&
+      !access.ownsConversation &&
+      avatar.connectionState !== "disconnected"
+    ) {
+      disconnect();
+    }
+  }, [
+    access.ownsConversation,
+    access.presenceReady,
+    avatar.connectionState,
+    disconnect,
+  ]);
 
   const controlledAvatar = {
     ...avatar,
@@ -81,6 +97,9 @@ export default function App() {
           }
           presenceReady={access.presenceReady}
           connectPending={access.requestPending}
+          conversationReclaimable={access.conversationReclaimable}
+          reclaimPending={access.reclaimPending}
+          onReclaimConversation={access.reclaimInactive}
         />
         <VoiceControls
           state={conversation.state}

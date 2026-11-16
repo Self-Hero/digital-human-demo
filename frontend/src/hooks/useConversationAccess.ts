@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   acquireConversation,
+  bindConversationAvatarSession,
   presenceWebSocketUrl,
+  reclaimInactiveConversation,
   releaseConversation,
   type ConversationAccessStatus,
 } from "../api/client";
@@ -10,6 +12,9 @@ import {
 const initialStatus: ConversationAccessStatus = {
   onlineClients: 0,
   conversationActive: false,
+  conversationInProgress: false,
+  conversationReclaimable: false,
+  conversationInactiveSeconds: 0,
   ownsConversation: false,
 };
 
@@ -21,6 +26,7 @@ export function useConversationAccess() {
   const [status, setStatus] = useState(initialStatus);
   const [presenceReady, setPresenceReady] = useState(false);
   const [requestPending, setRequestPending] = useState(false);
+  const [reclaimPending, setReclaimPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const applyStatus = useCallback((next: ConversationAccessStatus) => {
@@ -109,12 +115,48 @@ export function useConversationAccess() {
     }
   }, [applyStatus]);
 
+  const bindAvatarSession = useCallback(async (avatarSessionId: string) => {
+    try {
+      applyStatus(
+        await bindConversationAvatarSession(
+          clientIdRef.current,
+          avatarSessionId,
+        ),
+      );
+    } catch {
+      // WebRTC disconnect remains the fallback cleanup path.
+    }
+  }, [applyStatus]);
+
+  const reclaimInactive = useCallback(async (): Promise<boolean> => {
+    if (!presenceReady || reclaimPending) return false;
+    setReclaimPending(true);
+    setError(null);
+    try {
+      applyStatus(await reclaimInactiveConversation(clientIdRef.current));
+      return true;
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "当前无法释放闲置会话，请稍后再试",
+      );
+      return false;
+    } finally {
+      setReclaimPending(false);
+    }
+  }, [applyStatus, presenceReady, reclaimPending]);
+
   return {
     ...status,
+    clientId: clientIdRef.current,
     presenceReady,
     requestPending,
+    reclaimPending,
     error,
     acquire,
     release,
+    bindAvatarSession,
+    reclaimInactive,
   };
 }

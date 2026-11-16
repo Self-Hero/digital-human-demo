@@ -160,8 +160,10 @@ LiveTalking 的单路 WebRTC 会话在 `disconnected` 持续 5 秒后会自动�
 
 `--max_session 1` 必须保留。多个浏览器页面通过 FastAPI 的在线状态 WebSocket 同时
 接入，但只有取得独占对话席位的页面才会向 LiveTalking 发起 WebRTC offer。其他页面
-显示当前在线数和“活跃会话 1”，并提示当前已有用户正在对话；它们不会触发 LiveTalking
-的最大会话错误。持有者主动断开、关闭页面或网络连接失效时，后端自动释放对话席位。
+显示当前在线数和“活跃会话 1”，并提示数字人正在使用；它们不会触发 LiveTalking
+的最大会话错误。关闭麦克风不会释放席位。持有者主动断开、关闭页面或网络连接失效时，
+后端自动释放；若持有者当前没有进行语音轮次且连续5分钟没有对话，其他页面会显示
+“释放闲置会话”，由后端再次校验条件并回收对应的 LiveTalking session。
 
 `/api/v1/health` 只检查 FastAPI 进程；`/api/v1/ready` 还会检查 Realtime 凭证和
 LiveTalking 可访问性。`deploy/doctor.sh` 汇总这两个接口、systemd、GPU、监听端口、
