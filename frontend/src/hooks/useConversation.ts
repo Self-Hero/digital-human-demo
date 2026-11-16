@@ -294,11 +294,11 @@ export function useConversation(
     avatarMediaConnectedRef.current = avatarMediaConnected;
   }, [avatarMediaConnected]);
 
-  const startMicrophone = useCallback(async () => {
+  const startMicrophone = useCallback(async (): Promise<boolean> => {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       setError("实时语音连接尚未就绪");
-      return;
+      return false;
     }
 
     try {
@@ -343,6 +343,7 @@ export function useConversation(
       setError(null);
       setMicrophoneActive(true);
       setState("listening");
+      return true;
     } catch (microphoneError) {
       releaseMicrophone();
       setError(
@@ -351,6 +352,7 @@ export function useConversation(
           : "无法使用麦克风",
       );
       setState("error");
+      return false;
     }
   }, [releaseMicrophone]);
 
@@ -359,12 +361,12 @@ export function useConversation(
     setState("idle");
   }, [releaseMicrophone]);
 
-  const toggleMicrophone = useCallback(async () => {
+  const toggleMicrophone = useCallback(async (): Promise<boolean> => {
     if (mediaStreamRef.current) {
       stopMicrophone();
-    } else {
-      await startMicrophone();
+      return false;
     }
+    return startMicrophone();
   }, [startMicrophone, stopMicrophone]);
 
   const interrupt = useCallback(() => {

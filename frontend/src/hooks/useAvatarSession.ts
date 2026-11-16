@@ -79,7 +79,7 @@ export function useAvatarSession() {
     setConnectionState("disconnected");
   }, [audioStream, clearDisconnectTimer, stopPlaybackEvents, videoStream]);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (): Promise<boolean> => {
     if (peerRef.current) {
       disconnect();
     }
@@ -221,6 +221,7 @@ export function useAvatarSession() {
           }, 160);
         }
       };
+      return true;
     } catch (cause) {
       clearDisconnectTimer();
       peer.close();
@@ -234,6 +235,7 @@ export function useAvatarSession() {
           ? "数字人正在被另一个页面使用，请关闭其他页面后重试"
           : message,
       );
+      return false;
     }
   }, [clearDisconnectTimer, disconnect, stopPlaybackEvents]);
 

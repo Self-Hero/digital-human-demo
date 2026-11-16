@@ -1,13 +1,13 @@
-# 真人数字人实时对嘴 Demo 设计
+# 实时数字人交互系统
 
 ## 当前实现状态
 
-仓库已经包含第一阶段前后端框架：
+仓库包含可部署的单数字人实时交互系统：
 
-- `frontend/`：React + TypeScript + Vite 调试界面。
+- `frontend/`：React + TypeScript + Vite 正式交互界面。
 - `backend/`：FastAPI、WebSocket、会话状态和中断控制。
 - `backend/app/providers/`：端到端实时语音与 Avatar 的可替换接口；原 ASR、LLM、TTS 接口作为备用。
-- 当前使用 Mock 对话链路和 Mock Avatar，不需要 API Key 或 GPU。
+- 本地测试可使用 Mock Provider；服务器部署使用豆包 Realtime 和 MuseTalk。
 - `docs/IMPLEMENTATION_PLAN.md`：按阶段接入真实云 API 和 MuseTalk 的实施计划。
 - `docs/PUBLIC_SERVER_DEPLOYMENT.md`：新公网 GPU 服务器的地址、端口和 TURN/HTTPS 部署边界。
 - `docs/ONE_CLICK_DEPLOYMENT.md`：Ubuntu GPU 服务器一键安装、验证和人物素材接入；
@@ -32,8 +32,10 @@ bash deploy/install_full_stack.sh \
 bash deploy/doctor.sh ma_renda_dynamic
 ```
 
-单路 WebRTC 会话在异常断开后会自动回收；前端会在后端重启后创建新会话。嘴部
-时序稳定默认按口腔中心、唇线和外围接缝分区处理，减少抖动时不压慢快速口型。
+多个页面可以同时在线，但LiveTalking仍保持单路WebRTC会话。FastAPI通过独占对话
+席位阻止其他页面在占用期间请求LiveTalking，并在页面断开时自动释放。前端展示在线
+页面数和活跃会话数。嘴部时序稳定默认按口腔中心、唇线和外围接缝分区处理，减少抖动
+时不压慢快速口型。
 
 安装完成后，单独处理人物素材并启动 LiveTalking：
 

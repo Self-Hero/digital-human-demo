@@ -25,9 +25,19 @@ interface Props {
     connect: () => Promise<void>;
     disconnect: () => void;
   };
+  conversationBusy: boolean;
+  presenceReady: boolean;
+  connectPending: boolean;
 }
 
-export function DigitalHumanStage({ state, metrics, avatar }: Props) {
+export function DigitalHumanStage({
+  state,
+  metrics,
+  avatar,
+  conversationBusy,
+  presenceReady,
+  connectPending,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [mediaAspectRatio, setMediaAspectRatio] = useState(9 / 16);
@@ -83,6 +93,14 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
     "--avatar-aspect-ratio": mediaAspectRatio,
   } as CSSProperties;
   const orientation = mediaAspectRatio < 1 ? "portrait" : "landscape";
+  const connectMessage = !presenceReady
+    ? "正在连接交互服务"
+    : conversationBusy
+      ? "当前已有用户正在对话，请稍后再试"
+      : avatar.error ?? "数字人已就绪";
+  const connectDisabled =
+    !presenceReady || conversationBusy || connectPending ||
+    avatar.connectionState === "connecting";
 
   return (
     <section
@@ -137,14 +155,18 @@ export function DigitalHumanStage({ state, metrics, avatar }: Props) {
         )}
         {avatar.connectionState !== "connected" && (
           <div className="avatar-connect-panel">
-            <p>{avatar.error ?? "数字人视频尚未连接"}</p>
+            <p>{connectMessage}</p>
             <button
               className="primary-button"
               type="button"
               onClick={avatar.connect}
-              disabled={avatar.connectionState === "connecting"}
+              disabled={connectDisabled}
             >
-              {avatar.connectionState === "connecting" ? "连接中" : "连接数字人"}
+              {conversationBusy
+                ? "对话占用中"
+                : avatar.connectionState === "connecting" || connectPending
+                  ? "连接中"
+                  : "连接数字人"}
             </button>
           </div>
         )}

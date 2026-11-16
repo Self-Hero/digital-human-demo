@@ -33,3 +33,48 @@ export function realtimeWebSocketUrl(sessionId: string): string {
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();
 }
+
+export interface ConversationAccessStatus {
+  onlineClients: number;
+  conversationActive: boolean;
+  ownsConversation: boolean;
+}
+
+export function presenceWebSocketUrl(clientId: string): string {
+  const url = new URL(
+    `${apiBaseUrl}/access/presence/${encodeURIComponent(clientId)}`,
+  );
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+}
+
+async function accessRequest(
+  clientId: string,
+  method: "POST" | "DELETE",
+  keepalive = false,
+): Promise<ConversationAccessStatus> {
+  const response = await fetch(
+    `${apiBaseUrl}/access/conversation/${encodeURIComponent(clientId)}`,
+    { method, keepalive },
+  );
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: string;
+    } | null;
+    throw new Error(payload?.detail ?? `请求失败：HTTP ${response.status}`);
+  }
+  return (await response.json()) as ConversationAccessStatus;
+}
+
+export function acquireConversation(
+  clientId: string,
+): Promise<ConversationAccessStatus> {
+  return accessRequest(clientId, "POST");
+}
+
+export function releaseConversation(
+  clientId: string,
+  keepalive = false,
+): Promise<ConversationAccessStatus> {
+  return accessRequest(clientId, "DELETE", keepalive);
+}

@@ -10,6 +10,7 @@ router = APIRouter(tags=["health"])
 @router.get("/health")
 async def health() -> dict:
     settings = get_settings()
+    access = await container.access.snapshot()
     return {
         "status": "ok",
         "environment": settings.app_env,
@@ -21,6 +22,8 @@ async def health() -> dict:
             "avatar": settings.avatar_provider,
         },
         "activeSessions": container.sessions.active_count,
+        "onlineClients": access.online_clients,
+        "conversationActive": access.conversation_active,
     }
 
 
@@ -57,6 +60,7 @@ async def ready(response: Response) -> dict:
     missing = _missing_realtime_settings()
     avatar_ready, avatar_error = await _livetalking_ready()
     ready_now = not missing and avatar_ready
+    access = await container.access.snapshot()
     if not ready_now:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {
@@ -68,4 +72,6 @@ async def ready(response: Response) -> dict:
             "error": avatar_error,
         },
         "activeSessions": container.sessions.active_count,
+        "onlineClients": access.online_clients,
+        "conversationActive": access.conversation_active,
     }

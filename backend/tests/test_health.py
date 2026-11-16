@@ -17,6 +17,8 @@ def test_health_reports_mock_providers() -> None:
     assert payload["providers"]["realtime"] == "doubao"
     assert payload["providers"]["avatar"] == "mock"
     assert payload["activeSessions"] == 0
+    assert payload["onlineClients"] == 0
+    assert payload["conversationActive"] is False
 
 
 def test_ready_reports_dependencies(monkeypatch) -> None:
