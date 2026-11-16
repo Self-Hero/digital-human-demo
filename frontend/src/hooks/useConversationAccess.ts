@@ -12,9 +12,6 @@ import {
 const initialStatus: ConversationAccessStatus = {
   onlineClients: 0,
   conversationActive: false,
-  conversationInProgress: false,
-  conversationReclaimable: false,
-  conversationInactiveSeconds: 0,
   ownsConversation: false,
 };
 
@@ -56,7 +53,6 @@ export function useConversationAccess() {
         const next = JSON.parse(event.data) as ConversationAccessStatus;
         reconnectAttempt = 0;
         setPresenceReady(true);
-        setError(null);
         applyStatus(next);
       };
       socket.onerror = () => socket.close();

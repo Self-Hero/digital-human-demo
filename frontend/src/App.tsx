@@ -97,7 +97,6 @@ export default function App() {
           }
           presenceReady={access.presenceReady}
           connectPending={access.requestPending}
-          conversationReclaimable={access.conversationReclaimable}
           reclaimPending={access.reclaimPending}
           onReclaimConversation={access.reclaimInactive}
         />

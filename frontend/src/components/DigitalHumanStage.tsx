@@ -28,7 +28,6 @@ interface Props {
   conversationBusy: boolean;
   presenceReady: boolean;
   connectPending: boolean;
-  conversationReclaimable: boolean;
   reclaimPending: boolean;
   onReclaimConversation: () => Promise<boolean>;
 }
@@ -40,7 +39,6 @@ export function DigitalHumanStage({
   conversationBusy,
   presenceReady,
   connectPending,
-  conversationReclaimable,
   reclaimPending,
   onReclaimConversation,
 }: Props) {
@@ -102,9 +100,7 @@ export function DigitalHumanStage({
   const connectMessage = !presenceReady
     ? "正在连接交互服务"
     : conversationBusy
-      ? conversationReclaimable
-        ? "该会话已超过5分钟没有对话，可以释放"
-        : "当前数字人正在使用，请稍后再试"
+      ? avatar.error ?? "当前数字人正在使用，请稍后再试"
       : avatar.error ?? "数字人已就绪";
   const connectDisabled =
     !presenceReady || conversationBusy || connectPending ||
@@ -176,14 +172,14 @@ export function DigitalHumanStage({
                   ? "连接中"
                   : "连接数字人"}
             </button>
-            {conversationBusy && conversationReclaimable && (
+            {conversationBusy && (
               <button
                 className="reclaim-button"
                 type="button"
                 onClick={() => void onReclaimConversation()}
                 disabled={reclaimPending}
               >
-                {reclaimPending ? "正在释放" : "释放闲置会话"}
+                {reclaimPending ? "正在检查" : "尝试释放闲置会话"}
               </button>
             )}
           </div>

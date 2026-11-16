@@ -26,9 +26,6 @@ def _payload(snapshot: AccessSnapshot) -> dict[str, int | bool]:
     return {
         "onlineClients": snapshot.online_clients,
         "conversationActive": snapshot.conversation_active,
-        "conversationInProgress": snapshot.conversation_in_progress,
-        "conversationReclaimable": snapshot.conversation_reclaimable,
-        "conversationInactiveSeconds": snapshot.conversation_inactive_seconds,
         "ownsConversation": snapshot.owns_conversation,
     }
 

@@ -11,8 +11,10 @@ from app.services.conversation_access import ConversationAccessManager
 class FakeClock:
     def __init__(self) -> None:
         self.now = 0.0
+        self.calls = 0
 
     def __call__(self) -> float:
+        self.calls += 1
         return self.now
 
     def advance(self, seconds: float) -> None:
@@ -98,13 +100,32 @@ def test_inactive_conversation_can_only_be_reclaimed_after_five_minutes() -> Non
         clock.advance(299)
         too_early = await manager.reclaim_inactive("client-waiting")
         assert too_early.reclaimed is False
-        assert too_early.snapshot.conversation_reclaimable is False
 
         clock.advance(1)
         reclaimed = await manager.reclaim_inactive("client-waiting")
         assert reclaimed.reclaimed is True
         assert reclaimed.avatar_session_id == "avatar-session"
         assert reclaimed.snapshot.conversation_active is False
+
+    asyncio.run(scenario())
+
+
+def test_idle_duration_is_only_checked_when_reclaim_is_requested() -> None:
+    async def scenario() -> None:
+        clock = FakeClock()
+        manager = ConversationAccessManager(clock=clock)
+        await manager.connect("client-owner")
+        await manager.connect("client-waiting")
+        await manager.acquire("client-owner")
+        calls_after_acquire = clock.calls
+
+        await manager.snapshot("client-owner")
+        await manager.snapshot("client-waiting")
+        await manager.snapshot()
+        assert clock.calls == calls_after_acquire
+
+        await manager.reclaim_inactive("client-waiting")
+        assert clock.calls == calls_after_acquire + 1
 
     asyncio.run(scenario())
 

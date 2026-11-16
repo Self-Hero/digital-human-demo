@@ -12,8 +12,6 @@ class AccessSnapshot:
     online_clients: int
     conversation_active: bool
     conversation_in_progress: bool
-    conversation_reclaimable: bool
-    conversation_inactive_seconds: int
     owns_conversation: bool
 
 
@@ -99,12 +97,12 @@ class ConversationAccessManager:
             elif self._conversation_in_progress:
                 self._conversation_in_progress = False
                 self._last_activity_at = now
-            return self._snapshot(client_id, now=now)
+            return self._snapshot(client_id)
 
     async def reclaim_inactive(self, client_id: str) -> ReclaimResult:
         async with self._lock:
             now = self._clock()
-            snapshot = self._snapshot(client_id, now=now)
+            snapshot = self._snapshot(client_id)
             if client_id not in self._client_connections:
                 return ReclaimResult(False, snapshot, reason="页面连接已失效")
             if self._owner_id is None:
@@ -113,12 +111,17 @@ class ConversationAccessManager:
                 return ReclaimResult(False, snapshot, reason="不能释放当前页面的会话")
             if self._conversation_in_progress:
                 return ReclaimResult(False, snapshot, reason="当前会话正在对话中")
-            if not snapshot.conversation_reclaimable:
+            inactive_seconds = (
+                max(0, int(now - self._last_activity_at))
+                if self._last_activity_at is not None
+                else 0
+            )
+            if inactive_seconds < self._inactive_timeout_seconds:
                 remaining = max(
                     1,
                     int(
                         self._inactive_timeout_seconds
-                        - snapshot.conversation_inactive_seconds
+                        - inactive_seconds
                     ),
                 )
                 return ReclaimResult(
@@ -131,7 +134,7 @@ class ConversationAccessManager:
             self._clear_owner()
             return ReclaimResult(
                 True,
-                self._snapshot(client_id, now=now),
+                self._snapshot(client_id),
                 avatar_session_id=avatar_session_id,
             )
 
@@ -145,25 +148,10 @@ class ConversationAccessManager:
         self._conversation_in_progress = False
         self._last_activity_at = None
 
-    def _snapshot(
-        self, client_id: str | None, *, now: float | None = None
-    ) -> AccessSnapshot:
-        current = self._clock() if now is None else now
-        inactive_seconds = (
-            max(0, int(current - self._last_activity_at))
-            if self._owner_id is not None and self._last_activity_at is not None
-            else 0
-        )
-        reclaimable = (
-            self._owner_id is not None
-            and not self._conversation_in_progress
-            and inactive_seconds >= self._inactive_timeout_seconds
-        )
+    def _snapshot(self, client_id: str | None) -> AccessSnapshot:
         return AccessSnapshot(
             online_clients=len(self._client_connections),
             conversation_active=self._owner_id is not None,
             conversation_in_progress=self._conversation_in_progress,
-            conversation_reclaimable=reclaimable,
-            conversation_inactive_seconds=inactive_seconds,
             owns_conversation=self._owner_id == client_id,
         )

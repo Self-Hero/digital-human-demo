@@ -41,9 +41,6 @@ export function realtimeWebSocketUrl(sessionId: string): string {
 export interface ConversationAccessStatus {
   onlineClients: number;
   conversationActive: boolean;
-  conversationInProgress: boolean;
-  conversationReclaimable: boolean;
-  conversationInactiveSeconds: number;
   ownsConversation: boolean;
 }
 
