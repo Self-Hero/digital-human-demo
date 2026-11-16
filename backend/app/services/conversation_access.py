@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 
 DEFAULT_INACTIVE_TIMEOUT_SECONDS = 5 * 60
+DEFAULT_DISCONNECT_GRACE_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,7 @@ class ConversationAccessManager:
         self,
         *,
         inactive_timeout_seconds: float = DEFAULT_INACTIVE_TIMEOUT_SECONDS,
+        disconnect_grace_seconds: float = DEFAULT_DISCONNECT_GRACE_SECONDS,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._client_connections: dict[str, int] = {}
@@ -38,6 +40,7 @@ class ConversationAccessManager:
         self._conversation_in_progress = False
         self._last_activity_at: float | None = None
         self._inactive_timeout_seconds = inactive_timeout_seconds
+        self._disconnect_grace_seconds = disconnect_grace_seconds
         self._clock = clock
         self._lock = asyncio.Lock()
 
@@ -53,10 +56,25 @@ class ConversationAccessManager:
             remaining = self._client_connections.get(client_id, 0) - 1
             if remaining > 0:
                 self._client_connections[client_id] = remaining
-            else:
-                self._client_connections.pop(client_id, None)
+                return self._snapshot(client_id)
+
+            self._client_connections.pop(client_id, None)
+            should_delay_release = (
+                self._owner_id == client_id
+                and self._disconnect_grace_seconds > 0
+            )
+            if not should_delay_release:
                 if self._owner_id == client_id:
                     self._clear_owner()
+                return self._snapshot(client_id)
+
+        await asyncio.sleep(self._disconnect_grace_seconds)
+        async with self._lock:
+            if (
+                client_id not in self._client_connections
+                and self._owner_id == client_id
+            ):
+                self._clear_owner()
             return self._snapshot(client_id)
 
     async def acquire(self, client_id: str) -> tuple[bool, AccessSnapshot]:

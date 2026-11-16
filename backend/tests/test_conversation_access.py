@@ -23,7 +23,7 @@ class FakeClock:
 
 def test_only_one_client_can_acquire_conversation() -> None:
     async def scenario() -> None:
-        manager = ConversationAccessManager()
+        manager = ConversationAccessManager(disconnect_grace_seconds=0)
         await manager.connect("client-one")
         await manager.connect("client-two")
 
@@ -42,7 +42,7 @@ def test_only_one_client_can_acquire_conversation() -> None:
 
 def test_owner_disconnect_releases_conversation() -> None:
     async def scenario() -> None:
-        manager = ConversationAccessManager()
+        manager = ConversationAccessManager(disconnect_grace_seconds=0)
         await manager.connect("client-one")
         await manager.connect("client-two")
         assert (await manager.acquire("client-one"))[0] is True
@@ -59,7 +59,7 @@ def test_owner_disconnect_releases_conversation() -> None:
 
 def test_disconnected_client_cannot_acquire() -> None:
     async def scenario() -> None:
-        manager = ConversationAccessManager()
+        manager = ConversationAccessManager(disconnect_grace_seconds=0)
         acquired, snapshot = await manager.acquire("missing-client")
 
         assert acquired is False
@@ -70,7 +70,7 @@ def test_disconnected_client_cannot_acquire() -> None:
 
 def test_overlapping_reconnect_does_not_release_owner() -> None:
     async def scenario() -> None:
-        manager = ConversationAccessManager()
+        manager = ConversationAccessManager(disconnect_grace_seconds=0)
         await manager.connect("same-browser")
         assert (await manager.acquire("same-browser"))[0] is True
 
@@ -84,6 +84,43 @@ def test_overlapping_reconnect_does_not_release_owner() -> None:
         snapshot = await manager.disconnect("same-browser")
         assert snapshot.online_clients == 0
         assert snapshot.conversation_active is False
+
+    asyncio.run(scenario())
+
+
+def test_owner_reconnect_during_disconnect_grace_keeps_conversation() -> None:
+    async def scenario() -> None:
+        manager = ConversationAccessManager(disconnect_grace_seconds=0.02)
+        await manager.connect("same-browser")
+        assert (await manager.acquire("same-browser"))[0] is True
+
+        disconnect = asyncio.create_task(manager.disconnect("same-browser"))
+        await asyncio.sleep(0.005)
+        await manager.connect("same-browser")
+        await disconnect
+        snapshot = await manager.snapshot("same-browser")
+
+        assert snapshot.online_clients == 1
+        assert snapshot.conversation_active is True
+        assert snapshot.owns_conversation is True
+
+    asyncio.run(scenario())
+
+
+def test_owner_disconnect_releases_after_grace() -> None:
+    async def scenario() -> None:
+        manager = ConversationAccessManager(disconnect_grace_seconds=0.01)
+        await manager.connect("client-one")
+        assert (await manager.acquire("client-one"))[0] is True
+
+        disconnect = asyncio.create_task(manager.disconnect("client-one"))
+        await asyncio.sleep(0.002)
+        during_grace = await manager.snapshot("client-one")
+        released = await disconnect
+
+        assert during_grace.online_clients == 0
+        assert during_grace.conversation_active is True
+        assert released.conversation_active is False
 
     asyncio.run(scenario())
 
@@ -157,7 +194,10 @@ def test_active_turn_blocks_reclaim_and_resets_idle_timer() -> None:
     asyncio.run(scenario())
 
 
-def test_api_rejects_second_conversation_and_releases_on_disconnect() -> None:
+def test_api_rejects_second_conversation_and_releases_on_disconnect(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(container.access, "_disconnect_grace_seconds", 0)
     with TestClient(app) as client:
         with client.websocket_connect(
             "/api/v1/access/presence/browser-one"

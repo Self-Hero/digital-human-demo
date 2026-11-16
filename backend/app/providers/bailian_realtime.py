@@ -211,14 +211,6 @@ class BailianRealtimeBridge:
                 if not speaking:
                     speaking = True
                     await send({"type": "session.state", "state": "speaking"})
-                await send(
-                    {
-                        "type": "audio.delta",
-                        "turnId": current_turn_id,
-                        "audio": event.get("delta", ""),
-                        "sampleRate": 24_000,
-                    }
-                )
                 if audio_sink is not None:
                     delta = event.get("delta", "")
                     if isinstance(delta, str) and delta:

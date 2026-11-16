@@ -267,14 +267,6 @@ class DoubaoRealtimeBridge:
         if not self._speaking:
             self._speaking = True
             await send({"type": "session.state", "state": "speaking"})
-        await send(
-            {
-                "type": "audio.delta",
-                "turnId": self._current_turn_id,
-                "audio": base64.b64encode(pcm).decode("ascii"),
-                "sampleRate": 24_000,
-            }
-        )
         await audio_sink.append(pcm, self._current_turn_id)
 
     async def _handle_event(self, message: ServerMessage, send, audio_sink) -> bool:

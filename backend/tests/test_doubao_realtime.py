@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import gzip
 import json
 from collections.abc import AsyncIterator
@@ -149,12 +148,10 @@ def test_upstream_events_are_mapped_to_browser_and_livetalking() -> None:
     assert "transcript.user" in event_types
     assert "assistant.delta" in event_types
     assert "assistant.done" in event_types
-    assert "audio.delta" in event_types
+    assert "audio.delta" not in event_types
     assert "turn.completed" in event_types
     assert activity == [True, False]
     assert received[-1] == {"type": "session.state", "state": "idle"}
-    audio_event = next(event for event in received if event["type"] == "audio.delta")
-    assert base64.b64decode(audio_event["audio"]) == pcm
     assert len(sink.appended) == 1
     assert sink.appended[0][0] == pcm
     assert sink.appended[0][1]

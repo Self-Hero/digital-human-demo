@@ -169,15 +169,31 @@ export function useAvatarSession() {
         });
       }
 
-      const response = await fetch("/avatar-api/offer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sdp: peer.localDescription?.sdp,
-          type: peer.localDescription?.type,
-          avatar: import.meta.env.VITE_AVATAR_ID ?? "ma_renda_dynamic",
-        }),
-      });
+      const offerController = new AbortController();
+      const offerTimeout = window.setTimeout(
+        () => offerController.abort(),
+        15_000,
+      );
+      let response: Response;
+      try {
+        response = await fetch("/avatar-api/offer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sdp: peer.localDescription?.sdp,
+            type: peer.localDescription?.type,
+            avatar: import.meta.env.VITE_AVATAR_ID ?? "ma_renda_dynamic",
+          }),
+          signal: offerController.signal,
+        });
+      } catch (cause) {
+        if (offerController.signal.aborted) {
+          throw new Error("数字人连接超时，请重试");
+        }
+        throw cause;
+      } finally {
+        window.clearTimeout(offerTimeout);
+      }
       const answer = (await response.json()) as {
         sdp?: string;
         type?: RTCSdpType;

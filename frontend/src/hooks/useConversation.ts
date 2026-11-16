@@ -60,57 +60,13 @@ export function useConversation(
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const microphoneSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const silentGainRef = useRef<GainNode | null>(null);
-  const playbackSourcesRef = useRef(new Set<AudioBufferSourceNode>());
-  const nextPlaybackAtRef = useRef(0);
   const avatarSessionIdRef = useRef(avatarSessionId);
-  const avatarMediaConnectedRef = useRef(avatarMediaConnected);
 
   const [state, setState] = useState<SessionState>("connecting");
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
   const [metrics, setMetrics] = useState<TurnMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [microphoneActive, setMicrophoneActive] = useState(false);
-
-  const clearPlayback = useCallback(() => {
-    for (const source of playbackSourcesRef.current) {
-      try {
-        source.stop();
-      } catch {
-        // The source may already have finished.
-      }
-    }
-    playbackSourcesRef.current.clear();
-    const context = audioContextRef.current;
-    nextPlaybackAtRef.current = context?.currentTime ?? 0;
-  }, []);
-
-  const playPcm16 = useCallback((base64Audio: string, sampleRate: number) => {
-    const context = audioContextRef.current;
-    if (!context || context.state === "closed") return;
-
-    const binary = atob(base64Audio);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    const view = new DataView(bytes.buffer);
-    const sampleCount = Math.floor(bytes.byteLength / 2);
-    const audioBuffer = context.createBuffer(1, sampleCount, sampleRate);
-    const channel = audioBuffer.getChannelData(0);
-    for (let index = 0; index < sampleCount; index += 1) {
-      channel[index] = view.getInt16(index * 2, true) / 0x8000;
-    }
-
-    const source = context.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(context.destination);
-    playbackSourcesRef.current.add(source);
-    source.onended = () => playbackSourcesRef.current.delete(source);
-
-    const startAt = Math.max(context.currentTime + 0.04, nextPlaybackAtRef.current);
-    source.start(startAt);
-    nextPlaybackAtRef.current = startAt + audioBuffer.duration;
-  }, []);
 
   const releaseMicrophone = useCallback(() => {
     processorRef.current?.disconnect();
@@ -175,16 +131,6 @@ export function useConversation(
           }
           if (event.type === "session.state" && event.state) {
             setState(event.state);
-            return;
-          }
-          if (event.type === "playback.clear") {
-            clearPlayback();
-            return;
-          }
-          if (event.type === "audio.delta" && event.audio) {
-            if (!avatarMediaConnectedRef.current) {
-              playPcm16(event.audio, event.sampleRate ?? 24_000);
-            }
             return;
           }
           if (event.type === "transcript.user" && event.text) {
@@ -267,7 +213,6 @@ export function useConversation(
       disposed = true;
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       releaseMicrophone();
-      clearPlayback();
       socketRef.current?.close();
       void audioContextRef.current?.close();
       const sessionId = sessionIdRef.current;
@@ -279,8 +224,6 @@ export function useConversation(
   }, [
     avatarMediaConnected,
     clientId,
-    clearPlayback,
-    playPcm16,
     releaseMicrophone,
   ]);
 
@@ -296,10 +239,6 @@ export function useConversation(
       );
     }
   }, [avatarSessionId]);
-
-  useEffect(() => {
-    avatarMediaConnectedRef.current = avatarMediaConnected;
-  }, [avatarMediaConnected]);
 
   const startMicrophone = useCallback(async (): Promise<boolean> => {
     const socket = socketRef.current;
@@ -377,11 +316,10 @@ export function useConversation(
   }, [startMicrophone, stopMicrophone]);
 
   const interrupt = useCallback(() => {
-    clearPlayback();
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: "turn.interrupt" }));
-  }, [clearPlayback]);
+  }, []);
 
   return {
     state,
