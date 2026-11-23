@@ -19,7 +19,11 @@ TORCH_HOME="${TORCH_HOME:-${DATA_ROOT}/cache/torch}"
 PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 PYTORCH_INDEX_URL="${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
-CONDA_CHANNEL="${CONDA_CHANNEL:-https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge}"
+CONDA_CHANNEL_URL="${CONDA_CHANNEL_URL:-${CONDA_CHANNEL:-https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge}}"
+# CONDA_CHANNEL and CONDA_CHANNELS are interpreted by Conda as aliased
+# configuration keys. Cloud images may define CONDA_CHANNELS globally, so do
+# not leak either variable into the Miniconda installer.
+unset CONDA_CHANNEL CONDA_CHANNELS
 MINICONDA_INSTALLER_URL="${MINICONDA_INSTALLER_URL:-https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh}"
 
 LIVETALKING_ENV="livetalking"
@@ -58,7 +62,7 @@ Options:
 Environment overrides:
   DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, LIVETALKING_REPO_URL,
   LIVETALKING_REF, GITHUB_PROXY_PREFIX, HF_ENDPOINT, TORCH_HOME,
-  PIP_INDEX_URL, PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL,
+  PIP_INDEX_URL, PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL_URL,
   MINICONDA_INSTALLER_URL, STUN_URL, PUBLIC_PORT
 EOF
 }
@@ -351,13 +355,13 @@ export NPM_CONFIG_CACHE="${DATA_ROOT}/cache/npm"
 if [[ ! -x "${LIVETALKING_PY}" ]]; then
   log "Creating LiveTalking Conda environment"
   "${CONDA_BIN}" create -y -n "${LIVETALKING_ENV}" --override-channels \
-    -c "${CONDA_CHANNEL}" python=3.12 ffmpeg=7
+    -c "${CONDA_CHANNEL_URL}" python=3.12 ffmpeg=7
 fi
 
 if [[ ! -x "${APP_PY}" ]]; then
   log "Creating application build environment"
   "${CONDA_BIN}" create -y -n "${APP_ENV}" --override-channels \
-    -c "${CONDA_CHANNEL}" python=3.12 nodejs=20
+    -c "${CONDA_CHANNEL_URL}" python=3.12 nodejs=20
 fi
 
 conda_run "${LIVETALKING_ENV}" python -c \
@@ -367,7 +371,7 @@ conda_run "${APP_ENV}" python -c \
 if ! conda_run "${APP_ENV}" node --version >/dev/null 2>&1; then
   log "Repairing Node.js in the application build environment"
   "${CONDA_BIN}" install -y -n "${APP_ENV}" --override-channels \
-    -c "${CONDA_CHANNEL}" nodejs=20
+    -c "${CONDA_CHANNEL_URL}" nodejs=20
 fi
 
 log "Installing pinned CUDA PyTorch"
@@ -417,7 +421,7 @@ mapfile -t conda_dlib_packages < <(
 if ((${#conda_dlib_packages[@]})); then
   log "Removing incompatible Conda dlib packages"
   "${CONDA_BIN}" remove -y -n "${LIVETALKING_ENV}" --override-channels \
-    -c "${CONDA_CHANNEL}" \
+    -c "${CONDA_CHANNEL_URL}" \
     "${conda_dlib_packages[@]}"
 fi
 

@@ -75,7 +75,8 @@ available_kb="$(df -Pk "${DATA_ROOT}" | awk 'NR == 2 {print $4}')"
 export GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 export PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
-export CONDA_CHANNEL="${CONDA_CHANNEL:-https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge}"
+export CONDA_CHANNEL_URL="${CONDA_CHANNEL_URL:-${CONDA_CHANNEL:-https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge}}"
+unset CONDA_CHANNEL CONDA_CHANNELS
 
 bootstrap_args=(
   --public-ip "${PUBLIC_IP}"
