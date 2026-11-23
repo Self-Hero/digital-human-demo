@@ -202,6 +202,37 @@ verify_sha256() {
   echo "${expected}  ${file}" | sha256sum -c -
 }
 
+hf_download_files() {
+  local repository="$1"
+  local target_dir="$2"
+  shift 2
+  local files=("$@")
+  local file target partial direct_url all_present=1
+
+  for file in "${files[@]}"; do
+    [[ -s "${target_dir}/${file}" ]] || all_present=0
+  done
+  ((all_present)) && return 0
+
+  if conda_run "${LIVETALKING_ENV}" hf download "${repository}" \
+    "${files[@]}" --local-dir "${target_dir}"; then
+    return 0
+  fi
+
+  warn "Hugging Face API download failed for ${repository}; using direct file URLs."
+  for file in "${files[@]}"; do
+    target="${target_dir}/${file}"
+    [[ -s "${target}" ]] && continue
+    mkdir -p "$(dirname "${target}")"
+    partial="${target}.part"
+    direct_url="${HF_ENDPOINT%/}/${repository}/resolve/main/${file}"
+    curl --fail --location --retry 10 --retry-delay 5 --retry-all-errors \
+      --continue-at - --output "${partial}" "${direct_url}" || \
+      die "Unable to download ${repository}/${file} from ${direct_url}."
+    mv -- "${partial}" "${target}"
+  done
+}
+
 wait_for_url() {
   local url="$1"
   local attempts="${2:-30}"
@@ -446,24 +477,20 @@ fi
 if ((SKIP_MODELS == 0)); then
   log "Downloading MuseTalk 1.5 runtime models"
   mkdir -p "${LIVETALKING_DIR}/models"
-  conda_run "${LIVETALKING_ENV}" hf download TMElyralab/MuseTalk \
-    "musetalkV15/musetalk.json" "musetalkV15/unet.pth" \
-    --local-dir "${LIVETALKING_DIR}/models"
-  conda_run "${LIVETALKING_ENV}" hf download stabilityai/sd-vae-ft-mse \
-    "config.json" "diffusion_pytorch_model.bin" \
-    --local-dir "${LIVETALKING_DIR}/models/sd-vae"
-  conda_run "${LIVETALKING_ENV}" hf download openai/whisper-tiny \
-    "config.json" "pytorch_model.bin" "preprocessor_config.json" \
-    --local-dir "${LIVETALKING_DIR}/models/whisper"
+  hf_download_files TMElyralab/MuseTalk "${LIVETALKING_DIR}/models" \
+    "musetalkV15/musetalk.json" "musetalkV15/unet.pth"
+  hf_download_files stabilityai/sd-vae-ft-mse "${LIVETALKING_DIR}/models/sd-vae" \
+    "config.json" "diffusion_pytorch_model.bin"
+  hf_download_files openai/whisper-tiny "${LIVETALKING_DIR}/models/whisper" \
+    "config.json" "pytorch_model.bin" "preprocessor_config.json"
 
   # This mirrors the exact face parser files referenced by MuseTalk's official
   # download script. Fixed LFS digests prevent accepting altered mirror files.
-  conda_run "${LIVETALKING_ENV}" hf download ManyOtherFunctions/face-parse-bisent \
-    "79999_iter.pth" "resnet18-5c106cde.pth" \
-    --local-dir "${LIVETALKING_DIR}/models/face-parse-bisent"
-  conda_run "${LIVETALKING_ENV}" hf download n0x1103/s3fd \
-    "s3fd-619a316812.pth" \
-    --local-dir "${TORCH_HOME}/hub/checkpoints"
+  hf_download_files ManyOtherFunctions/face-parse-bisent \
+    "${LIVETALKING_DIR}/models/face-parse-bisent" \
+    "79999_iter.pth" "resnet18-5c106cde.pth"
+  hf_download_files n0x1103/s3fd "${TORCH_HOME}/hub/checkpoints" \
+    "s3fd-619a316812.pth"
 
 fi
 
