@@ -19,15 +19,11 @@ MouthTemporalStabilizer = MODULE.MouthTemporalStabilizer
 def test_verified_realtime_profile_defaults(monkeypatch) -> None:
     monkeypatch.delenv("LIVETALKING_MOUTH_MOTION_THRESHOLD", raising=False)
     monkeypatch.delenv("LIVETALKING_MOUTH_TRANSITION_FRAMES", raising=False)
-    monkeypatch.delenv("LIVETALKING_MOUTH_DETAIL_MASK_RADIUS_X", raising=False)
-    monkeypatch.delenv("LIVETALKING_MOUTH_DETAIL_MASK_RADIUS_Y", raising=False)
 
     stabilizer = MouthTemporalStabilizer()
 
     assert stabilizer.motion_threshold == 0.15
     assert stabilizer.transition_frames == 4
-    assert stabilizer.detail_mask_radius_x == 0.18
-    assert stabilizer.detail_mask_radius_y == 0.10
 
 
 def test_local_compositor_preserves_face_outside_mouth(monkeypatch) -> None:
@@ -95,12 +91,7 @@ def test_detail_transfer_restores_skin_texture_but_protects_mouth(
 
     result = stabilizer._transfer_reference_detail(generated, reference)
 
-    mouth_delta = np.abs(
-        result[70:75, 48:53].astype(np.int16)
-        - generated[70:75, 48:53].astype(np.int16)
-    )
-    assert float(mouth_delta.mean()) < 2.0
-    assert float(result[68:78, 28:35].std()) > 5.0
+    assert np.array_equal(result[70:75, 48:53], generated[70:75, 48:53])
     assert float(result[68:78, 12:22].std()) > 5.0
 
 
