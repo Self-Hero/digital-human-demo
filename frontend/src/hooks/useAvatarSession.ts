@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { appPath, appUrl } from "../appPath";
+
 export type AvatarConnectionState =
   | "disconnected"
   | "connecting"
@@ -26,7 +28,7 @@ function avatarPlaybackStatus(data: string): "start" | "end" | null {
 
 function releaseAvatarSession(sessionId: string | null): void {
   if (!sessionId) return;
-  void fetch(`/avatar-api/session/${encodeURIComponent(sessionId)}`, {
+  void fetch(appPath(`/avatar-api/session/${encodeURIComponent(sessionId)}`), {
     method: "DELETE",
     keepalive: true,
   }).catch(() => undefined);
@@ -176,7 +178,7 @@ export function useAvatarSession() {
       );
       let response: Response;
       try {
-        response = await fetch("/avatar-api/offer", {
+        response = await fetch(appPath("/avatar-api/offer"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -214,7 +216,7 @@ export function useAvatarSession() {
       setSessionId(nextSessionId);
 
       stopPlaybackEvents();
-      const eventUrl = new URL("/avatar-api/sse", window.location.href);
+      const eventUrl = appUrl("/avatar-api/sse");
       if (nextSessionId) eventUrl.searchParams.set("sessionid", nextSessionId);
       const eventSource = new EventSource(eventUrl);
       eventSourceRef.current = eventSource;

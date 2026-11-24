@@ -13,6 +13,7 @@ LIVETALKING_REF="${LIVETALKING_REF:-c7269433a2b6ecebcd9342445d2ecc882c98b0da}"
 GITHUB_PROXY_PREFIX="${GITHUB_PROXY_PREFIX:-https://ghfast.top/}"
 PUBLIC_IP="${PUBLIC_IP:-36.103.177.214}"
 PUBLIC_PORT="${PUBLIC_PORT:-9000}"
+BASE_PATH="${BASE_PATH:-/}"
 STUN_URL="${STUN_URL:-stun:stun.freeswitch.org:3478}"
 HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 TORCH_HOME="${TORCH_HOME:-${DATA_ROOT}/cache/torch}"
@@ -51,6 +52,7 @@ and an Nginx public entrypoint on Ubuntu 22.04.
 Options:
   --public-ip IP             Public IPv4 used in CORS (default: 36.103.177.214)
   --public-port PORT         Nginx public HTTP port (default: 9000)
+  --base-path PATH           Frontend URL prefix (default: /)
   --enable-gfpgan            Enable the RTX 4090 realtime GFPGAN profile
   --enable-silence-inference Apply the optional zero-audio MuseTalk patch
   --skip-apt                 Do not install Ubuntu packages
@@ -63,7 +65,7 @@ Environment overrides:
   DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, LIVETALKING_REPO_URL,
   LIVETALKING_REF, GITHUB_PROXY_PREFIX, HF_ENDPOINT, TORCH_HOME,
   PIP_INDEX_URL, PYTORCH_INDEX_URL, NPM_REGISTRY, CONDA_CHANNEL_URL,
-  MINICONDA_INSTALLER_URL, STUN_URL, PUBLIC_PORT
+  MINICONDA_INSTALLER_URL, STUN_URL, PUBLIC_PORT, BASE_PATH
 EOF
 }
 
@@ -142,6 +144,7 @@ while (($#)); do
   case "$1" in
     --public-ip) require_option_value "$1" "${2:-}"; PUBLIC_IP="$2"; shift 2 ;;
     --public-port) require_option_value "$1" "${2:-}"; PUBLIC_PORT="$2"; shift 2 ;;
+    --base-path) require_option_value "$1" "${2:-}"; BASE_PATH="$2"; shift 2 ;;
     --enable-gfpgan)
       ENABLE_GFPGAN=1
       MUSETALK_BATCH_SIZE=8
@@ -164,6 +167,11 @@ done
 [[ "${PUBLIC_PORT}" =~ ^[0-9]+$ ]] || die "Public port must be numeric."
 ((PUBLIC_PORT >= 1 && PUBLIC_PORT <= 65535)) || \
   die "Public port must be between 1 and 65535."
+[[ "${BASE_PATH}" == / || "${BASE_PATH}" =~ ^/[A-Za-z0-9._/-]+/$ ]] || \
+  die "Base path must start and end with / and contain only URL-safe path characters."
+[[ "${BASE_PATH}" != *"//"* ]] || die "Base path must not contain //."
+[[ ! "${BASE_PATH}" =~ (^|/)\.{1,2}(/|$) ]] || \
+  die "Base path must not contain . or .. components."
 if [[ "${PUBLIC_PORT}" == 80 ]]; then
   PUBLIC_ORIGIN="http://${PUBLIC_IP}"
 else
@@ -517,6 +525,9 @@ if [[ ! -f "${PROJECT_DIR}/frontend/.env.production" ]]; then
   cp "${PROJECT_DIR}/frontend/.env.example" "${PROJECT_DIR}/frontend/.env.production"
 fi
 set_env_value "${PROJECT_DIR}/frontend/.env.production" VITE_AVATAR_ID "${DEFAULT_AVATAR_ID}"
+set_env_value "${PROJECT_DIR}/frontend/.env.production" VITE_BASE_PATH "${BASE_PATH}"
+set_env_value "${PROJECT_DIR}/frontend/.env.production" \
+  VITE_API_BASE_URL "${BASE_PATH}api/v1"
 set_env_value "${PROJECT_DIR}/frontend/.env.production" VITE_STUN_URL "${STUN_URL}"
 (
   cd "${PROJECT_DIR}/frontend"
@@ -681,13 +692,14 @@ verify_deployment
 cat <<EOF
 
 Installation finished.
-Public page: ${PUBLIC_ORIGIN}/
+Public page: ${PUBLIC_ORIGIN}${BASE_PATH}
 Backend env: ${PROJECT_DIR}/backend/.env
 LiveTalking: ${LIVETALKING_DIR}
 
 Prepare and start an avatar separately with:
   bash deploy/start_avatar.sh \\
-    --avatar-source /data/source/avatar.mp4 --avatar-id ${DEFAULT_AVATAR_ID}
+    --avatar-source /data/source/avatar.mp4 --avatar-id ${DEFAULT_AVATAR_ID} \\
+    --base-path ${BASE_PATH}
 
 For microphone access, bind a domain and enable trusted HTTPS.
 EOF

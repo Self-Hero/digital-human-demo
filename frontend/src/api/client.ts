@@ -1,5 +1,7 @@
+import { appPath } from "../appPath";
+
 const apiBaseUrl = new URL(
-  import.meta.env.VITE_API_BASE_URL ?? "/api/v1",
+  appPath(import.meta.env.VITE_API_BASE_URL ?? "/api/v1"),
   window.location.origin,
 ).toString().replace(/\/$/, "");
 

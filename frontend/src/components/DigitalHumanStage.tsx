@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
+import { appPath } from "../appPath";
 import type { AvatarConnectionState } from "../hooks/useAvatarSession";
 import type { SessionState, TurnMetrics } from "../types/conversation";
 
@@ -46,7 +47,10 @@ export function DigitalHumanStage({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [mediaAspectRatio, setMediaAspectRatio] = useState(9 / 16);
   const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
-  const idleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE;
+  const configuredIdleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE;
+  const idleImage = configuredIdleImage
+    ? appPath(configuredIdleImage)
+    : undefined;
   const visualState =
     avatar.connectionState === "failed"
       ? "error"

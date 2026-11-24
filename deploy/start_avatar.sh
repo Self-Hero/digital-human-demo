@@ -13,6 +13,7 @@ LIVETALKING_ENV="livetalking"
 APP_ENV="digitalhuman"
 AVATAR_ID="ma_renda_dynamic"
 AVATAR_SOURCE=""
+BASE_PATH="${BASE_PATH:-}"
 
 usage() {
   cat <<'EOF'
@@ -25,10 +26,11 @@ download dependencies and models.
 Options:
   --avatar-source PATH       Source video/image to preprocess (optional when prepared)
   --avatar-id ID             Avatar id (default: ma_renda_dynamic)
+  --base-path PATH           Frontend URL prefix (preserves the current value by default)
   -h, --help                 Show this help
 
 Environment overrides:
-  DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, TORCH_HOME
+  DATA_ROOT, CONDA_ROOT, LIVETALKING_DIR, TORCH_HOME, BASE_PATH
 EOF
 }
 
@@ -45,6 +47,7 @@ while (($#)); do
   case "$1" in
     --avatar-source) require_option_value "$1" "${2:-}"; AVATAR_SOURCE="$2"; shift 2 ;;
     --avatar-id) require_option_value "$1" "${2:-}"; AVATAR_ID="$2"; shift 2 ;;
+    --base-path) require_option_value "$1" "${2:-}"; BASE_PATH="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -131,7 +134,16 @@ log "Configuring frontend for avatar ${AVATAR_ID}"
 if [[ ! -f "${FRONTEND_ENV}" ]]; then
   cp "${PROJECT_DIR}/frontend/.env.example" "${FRONTEND_ENV}"
 fi
+if [[ -z "${BASE_PATH}" ]]; then
+  BASE_PATH="$(sed -n 's/^VITE_BASE_PATH=//p' "${FRONTEND_ENV}" | tail -n 1)"
+  BASE_PATH="${BASE_PATH:-/}"
+fi
+[[ "${BASE_PATH}" == / || "${BASE_PATH}" =~ ^/[A-Za-z0-9._/-]+/$ ]] || die "Invalid base path: ${BASE_PATH}"
+[[ "${BASE_PATH}" != *"//"* ]] || die "Invalid base path: ${BASE_PATH}"
+[[ ! "${BASE_PATH}" =~ (^|/)\.{1,2}(/|$) ]] || die "Invalid base path: ${BASE_PATH}"
 set_env_value "${FRONTEND_ENV}" VITE_AVATAR_ID "${AVATAR_ID}"
+set_env_value "${FRONTEND_ENV}" VITE_BASE_PATH "${BASE_PATH}"
+set_env_value "${FRONTEND_ENV}" VITE_API_BASE_URL "${BASE_PATH}api/v1"
 (
   cd "${PROJECT_DIR}/frontend"
   conda_run "${APP_ENV}" npm run build

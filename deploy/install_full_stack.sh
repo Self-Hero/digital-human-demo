@@ -8,6 +8,7 @@ DATA_ROOT="${DATA_ROOT:-/data}"
 
 PUBLIC_IP=""
 PUBLIC_PORT="9000"
+BASE_PATH="${BASE_PATH:-/}"
 AVATAR_SOURCE=""
 AVATAR_ID="ma_renda_dynamic"
 ENABLE_SILENCE_INFERENCE=0
@@ -27,6 +28,7 @@ the default real-time stack. CodeFormer has a separate explicit installer.
 Options:
   --public-ip IP          Public IPv4 used by the frontend (required)
   --public-port PORT      Nginx HTTP port (default: 9000)
+  --base-path PATH        Frontend URL prefix (default: /)
   --avatar-source PATH    Source video/image to preprocess
   --avatar-id ID          Avatar id (default: ma_renda_dynamic)
   --enable-gfpgan         Enable the optimized RTX 4090 realtime profile
@@ -51,6 +53,7 @@ while (($#)); do
   case "$1" in
     --public-ip) require_value "$1" "${2:-}"; PUBLIC_IP="$2"; shift 2 ;;
     --public-port) require_value "$1" "${2:-}"; PUBLIC_PORT="$2"; shift 2 ;;
+    --base-path) require_value "$1" "${2:-}"; BASE_PATH="$2"; shift 2 ;;
     --avatar-source) require_value "$1" "${2:-}"; AVATAR_SOURCE="$2"; shift 2 ;;
     --avatar-id) require_value "$1" "${2:-}"; AVATAR_ID="$2"; shift 2 ;;
     --enable-gfpgan) ENABLE_GFPGAN=1; shift ;;
@@ -63,6 +66,9 @@ done
 [[ -n "${PUBLIC_IP}" ]] || die "--public-ip is required"
 [[ "${PUBLIC_PORT}" =~ ^[0-9]+$ ]] || die "--public-port must be numeric"
 ((PUBLIC_PORT >= 1 && PUBLIC_PORT <= 65535)) || die "Invalid public port"
+[[ "${BASE_PATH}" == / || "${BASE_PATH}" =~ ^/[A-Za-z0-9._/-]+/$ ]] || die "Invalid base path"
+[[ "${BASE_PATH}" != *"//"* ]] || die "Invalid base path"
+[[ ! "${BASE_PATH}" =~ (^|/)\.{1,2}(/|$) ]] || die "Invalid base path"
 [[ "${AVATAR_ID}" =~ ^[A-Za-z0-9._-]+$ ]] || die "Invalid avatar id"
 if [[ -n "${AVATAR_SOURCE}" ]]; then
   [[ -s "${AVATAR_SOURCE}" ]] || die "Avatar source is missing: ${AVATAR_SOURCE}"
@@ -81,6 +87,7 @@ unset CONDA_CHANNEL CONDA_CHANNELS
 bootstrap_args=(
   --public-ip "${PUBLIC_IP}"
   --public-port "${PUBLIC_PORT}"
+  --base-path "${BASE_PATH}"
 )
 if ((ENABLE_SILENCE_INFERENCE)); then
   bootstrap_args+=(--enable-silence-inference)
@@ -102,7 +109,8 @@ bash "${PROJECT_DIR}/deploy/install_gfpgan.sh"
 if [[ -n "${AVATAR_SOURCE}" ]]; then
   echo "[3/3] Preparing and starting avatar ${AVATAR_ID}"
   bash "${PROJECT_DIR}/deploy/start_avatar.sh" \
-    --avatar-source "${AVATAR_SOURCE}" --avatar-id "${AVATAR_ID}"
+    --avatar-source "${AVATAR_SOURCE}" --avatar-id "${AVATAR_ID}" \
+    --base-path "${BASE_PATH}"
 else
   echo "[3/3] Avatar preparation skipped because --avatar-source was not supplied"
 fi
@@ -117,13 +125,13 @@ else
   echo "Realtime GFPGAN: disabled (MuseTalk batch 4)"
 fi
 if [[ "${PUBLIC_PORT}" == 80 ]]; then
-  echo "Public page: http://${PUBLIC_IP}/"
+  echo "Public page: http://${PUBLIC_IP}${BASE_PATH}"
 else
-  echo "Public page: http://${PUBLIC_IP}:${PUBLIC_PORT}/"
+  echo "Public page: http://${PUBLIC_IP}:${PUBLIC_PORT}${BASE_PATH}"
 fi
 if [[ -z "${AVATAR_SOURCE}" ]]; then
   cat <<EOF
 Prepare and start an avatar later with:
-  bash deploy/start_avatar.sh --avatar-source /data/source/avatar.mp4 --avatar-id ${AVATAR_ID}
+  bash deploy/start_avatar.sh --avatar-source /data/source/avatar.mp4 --avatar-id ${AVATAR_ID} --base-path ${BASE_PATH}
 EOF
 fi
