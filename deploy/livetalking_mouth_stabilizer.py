@@ -43,6 +43,9 @@ class MouthTemporalStabilizer:
         self.sharpen_strength = _env_float(
             "LIVETALKING_MOUTH_SHARPEN", 0.18, 0.0, 0.6
         )
+        self.detail_transfer_strength = _env_float(
+            "LIVETALKING_MOUTH_DETAIL_TRANSFER", 0.0, 0.0, 2.0
+        )
         self.local_mask_center_y = _env_float(
             "LIVETALKING_MOUTH_MASK_CENTER_Y", 0.72, 0.55, 0.90
         )
@@ -83,14 +86,17 @@ class MouthTemporalStabilizer:
         self._mask_cache: dict[tuple[int, int], np.ndarray] = {}
         self._adaptive_mask_cache: dict[tuple[int, int], np.ndarray] = {}
         self._face_mask_cache: dict[tuple[int, int], np.ndarray] = {}
+        self._detail_mask_cache: dict[tuple[int, int], np.ndarray] = {}
         logger.info(
             "MuseTalk mouth compositor: local=%s color_match=%.3f "
-            "sharpen=%.3f mask=(cy=%.3f rx=%.3f ry=%.3f feather=%.3f) "
+            "sharpen=%.3f detail_transfer=%.3f "
+            "mask=(cy=%.3f rx=%.3f ry=%.3f feather=%.3f) "
             "temporal=%s adaptive=%s inner_strength=%.3f optical_flow=%s "
             "strength=%.3f threshold=%.3f transition_frames=%d",
             self.local_compositor,
             self.color_match_strength,
             self.sharpen_strength,
+            self.detail_transfer_strength,
             self.local_mask_center_y,
             self.local_mask_radius_x,
             self.local_mask_radius_y,
@@ -250,6 +256,7 @@ class MouthTemporalStabilizer:
                 -self.sharpen_strength,
                 0.0,
             )
+        processed = self._transfer_reference_detail(processed, reference)
 
         mask_2d = mask[..., 0]
         generated_frame[y1:y2, x1:x2] = cv2.blendLinear(
@@ -292,6 +299,34 @@ class MouthTemporalStabilizer:
             return generated
         return np.clip(
             generated.astype(np.float32) + offset.reshape(1, 1, 3),
+            0,
+            255,
+        ).astype(np.uint8)
+
+    def _transfer_reference_detail(
+        self,
+        generated: np.ndarray,
+        reference: np.ndarray,
+    ) -> np.ndarray:
+        """Restore source skin texture without copying source mouth geometry."""
+        if (
+            self.detail_transfer_strength <= 0
+            or generated.shape != reference.shape
+            or generated.size == 0
+        ):
+            return generated
+
+        height, width = generated.shape[:2]
+        sigma = max(0.8, min(height, width) * 0.006)
+        reference_float = reference.astype(np.float32)
+        low_frequency = cv2.GaussianBlur(reference_float, (0, 0), sigma)
+        detail = np.clip(reference_float - low_frequency, -24.0, 24.0)
+        gain = (
+            self._detail_skin_mask(height, width)
+            * self.detail_transfer_strength
+        )
+        return np.clip(
+            generated.astype(np.float32) + detail * gain,
             0,
             255,
         ).astype(np.uint8)
@@ -472,4 +507,30 @@ class MouthTemporalStabilizer:
         sigma = max(1.0, min(height, width) * self.local_mask_feather)
         mask = cv2.GaussianBlur(mask, (0, 0), sigma)[..., None]
         self._face_mask_cache[key] = mask
+        return mask
+
+    def _detail_skin_mask(self, height: int, width: int) -> np.ndarray:
+        """Keep transferred detail off generated lips, teeth, and oral cavity."""
+        key = (height, width)
+        cached = self._detail_mask_cache.get(key)
+        if cached is not None:
+            return cached
+
+        protected_mouth = np.zeros((height, width), dtype=np.float32)
+        cv2.ellipse(
+            protected_mouth,
+            (width // 2, int(height * 0.72)),
+            (max(1, int(width * 0.26)), max(1, int(height * 0.16))),
+            0,
+            0,
+            360,
+            1.0,
+            -1,
+        )
+        sigma = max(1.0, min(height, width) * 0.025)
+        protected_mouth = cv2.GaussianBlur(
+            protected_mouth, (0, 0), sigma
+        )
+        mask = np.clip(1.0 - protected_mouth, 0.0, 1.0)[..., None]
+        self._detail_mask_cache[key] = mask
         return mask

@@ -76,6 +76,25 @@ def test_local_compositor_can_be_disabled(monkeypatch) -> None:
     assert np.array_equal(result, generated)
 
 
+def test_detail_transfer_restores_skin_texture_but_protects_mouth(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("LIVETALKING_MOUTH_DETAIL_TRANSFER", "2")
+
+    stabilizer = MouthTemporalStabilizer()
+    assert stabilizer.detail_transfer_strength == 2.0
+    generated = np.full((100, 100, 3), 128, dtype=np.uint8)
+    checker = (np.indices((100, 100)).sum(axis=0) % 2) * 40 - 20
+    reference = np.clip(
+        generated.astype(np.int16) + checker[..., None], 0, 255
+    ).astype(np.uint8)
+
+    result = stabilizer._transfer_reference_detail(generated, reference)
+
+    assert np.array_equal(result[70:75, 48:53], generated[70:75, 48:53])
+    assert float(result[68:78, 12:22].std()) > 5.0
+
+
 def test_adaptive_temporal_mask_protects_inner_mouth(monkeypatch) -> None:
     monkeypatch.setenv("LIVETALKING_MOUTH_ADAPTIVE", "1")
     monkeypatch.setenv("LIVETALKING_MOUTH_INNER_STRENGTH", "0.08")
