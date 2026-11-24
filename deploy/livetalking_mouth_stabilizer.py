@@ -46,6 +46,12 @@ class MouthTemporalStabilizer:
         self.detail_transfer_strength = _env_float(
             "LIVETALKING_MOUTH_DETAIL_TRANSFER", 0.0, 0.0, 2.0
         )
+        self.detail_mask_radius_x = _env_float(
+            "LIVETALKING_MOUTH_DETAIL_MASK_RADIUS_X", 0.18, 0.08, 0.30
+        )
+        self.detail_mask_radius_y = _env_float(
+            "LIVETALKING_MOUTH_DETAIL_MASK_RADIUS_Y", 0.10, 0.05, 0.20
+        )
         self.local_mask_center_y = _env_float(
             "LIVETALKING_MOUTH_MASK_CENTER_Y", 0.72, 0.55, 0.90
         )
@@ -89,7 +95,7 @@ class MouthTemporalStabilizer:
         self._detail_mask_cache: dict[tuple[int, int], np.ndarray] = {}
         logger.info(
             "MuseTalk mouth compositor: local=%s color_match=%.3f "
-            "sharpen=%.3f detail_transfer=%.3f "
+            "sharpen=%.3f detail_transfer=%.3f detail_mask=(rx=%.3f ry=%.3f) "
             "mask=(cy=%.3f rx=%.3f ry=%.3f feather=%.3f) "
             "temporal=%s adaptive=%s inner_strength=%.3f optical_flow=%s "
             "strength=%.3f threshold=%.3f transition_frames=%d",
@@ -97,6 +103,8 @@ class MouthTemporalStabilizer:
             self.color_match_strength,
             self.sharpen_strength,
             self.detail_transfer_strength,
+            self.detail_mask_radius_x,
+            self.detail_mask_radius_y,
             self.local_mask_center_y,
             self.local_mask_radius_x,
             self.local_mask_radius_y,
@@ -520,7 +528,10 @@ class MouthTemporalStabilizer:
         cv2.ellipse(
             protected_mouth,
             (width // 2, int(height * 0.72)),
-            (max(1, int(width * 0.26)), max(1, int(height * 0.16))),
+            (
+                max(1, int(width * self.detail_mask_radius_x)),
+                max(1, int(height * self.detail_mask_radius_y)),
+            ),
             0,
             0,
             360,
