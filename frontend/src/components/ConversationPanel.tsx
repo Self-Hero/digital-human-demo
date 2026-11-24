@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import type { TranscriptItem } from "../types/conversation";
 
 interface Props {
@@ -5,26 +7,24 @@ interface Props {
 }
 
 export function ConversationPanel({ transcript }: Props) {
-  return (
-    <section className="conversation-panel" aria-labelledby="conversation-title">
-      <header>
-        <h2 id="conversation-title">对话记录</h2>
-        <span className="message-count">{transcript.length} 条</span>
-      </header>
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
-      <div className="transcript" aria-live="polite">
-        {transcript.length === 0 ? (
-          <div className="empty-transcript">
-            暂无对话
-          </div>
-        ) : (
-          transcript.map((item) => (
-            <article className={`message ${item.role}`} key={item.id}>
-              <span>{item.role === "user" ? "你" : "数字人"}</span>
-              <p>{item.text}</p>
-            </article>
-          ))
-        )}
+  useEffect(() => {
+    const element = transcriptRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [transcript]);
+
+  if (transcript.length === 0) return null;
+
+  return (
+    <section className="conversation-panel" aria-label="实时对话">
+      <div className="transcript" ref={transcriptRef} role="log" aria-live="polite">
+        {transcript.map((item) => (
+          <article className={`message ${item.role}`} key={item.id}>
+            <span>{item.role === "user" ? "你" : "数字人"}</span>
+            <p>{item.text}</p>
+          </article>
+        ))}
       </div>
     </section>
   );

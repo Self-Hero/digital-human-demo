@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 
 import { appPath } from "../appPath";
 import type { AvatarConnectionState } from "../hooks/useAvatarSession";
@@ -24,8 +25,8 @@ interface Props {
     playbackSpeaking: boolean;
     error: string | null;
     connect: () => Promise<void>;
-    disconnect: () => void;
   };
+  onlineClients: number;
   conversationBusy: boolean;
   presenceReady: boolean;
   connectPending: boolean;
@@ -37,6 +38,7 @@ export function DigitalHumanStage({
   state,
   metrics,
   avatar,
+  onlineClients,
   conversationBusy,
   presenceReady,
   connectPending,
@@ -47,6 +49,7 @@ export function DigitalHumanStage({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [mediaAspectRatio, setMediaAspectRatio] = useState(9 / 16);
   const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
+  const [outputMuted, setOutputMuted] = useState(false);
   const configuredIdleImage = import.meta.env.VITE_AVATAR_IDLE_IMAGE;
   const idleImage = configuredIdleImage
     ? appPath(configuredIdleImage)
@@ -87,6 +90,10 @@ export function DigitalHumanStage({
       .then(() => setAudioPlaybackBlocked(false))
       .catch(() => setAudioPlaybackBlocked(true));
   }, [avatar.audioStream]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.muted = outputMuted;
+  }, [outputMuted]);
 
   const resumeAudioPlayback = () => {
     const audio = audioRef.current;
@@ -152,6 +159,33 @@ export function DigitalHumanStage({
           />
         )}
         <audio ref={audioRef} autoPlay />
+        <div className="stage-shade" aria-hidden="true" />
+        <header className="stage-header">
+          <div className="stage-heading" aria-live="polite">
+            <div className="stage-status">
+              <span className={`status-dot state-${visualState}`} />
+              <strong>{statusLabel}</strong>
+            </div>
+            <div className="service-meta">
+              <span>在线 {onlineClients}</span>
+              {metrics && (
+                <span>
+                  首段 {metrics.firstAudioMs ?? "—"} ms · 完整 {metrics.totalMs} ms
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            className="output-button"
+            type="button"
+            aria-label={outputMuted ? "开启播报声音" : "关闭播报声音"}
+            aria-pressed={outputMuted}
+            title={outputMuted ? "开启播报声音" : "关闭播报声音"}
+            onClick={() => setOutputMuted((muted) => !muted)}
+          >
+            {outputMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          </button>
+        </header>
         {audioPlaybackBlocked && avatar.connectionState === "connected" && (
           <button
             className="audio-unlock-button"
@@ -163,7 +197,10 @@ export function DigitalHumanStage({
         )}
         {avatar.connectionState !== "connected" && (
           <div className="avatar-connect-panel">
-            <p>{connectMessage}</p>
+            <div className="connect-copy">
+              <span>实时数字人咨询</span>
+              <p>{connectMessage}</p>
+            </div>
             <button
               className="primary-button"
               type="button"
@@ -174,7 +211,7 @@ export function DigitalHumanStage({
                 ? "数字人使用中"
                 : avatar.connectionState === "connecting" || connectPending
                   ? "连接中"
-                  : "连接数字人"}
+                  : "点击开始实时咨询"}
             </button>
             {conversationBusy && (
               <button
@@ -187,27 +224,6 @@ export function DigitalHumanStage({
               </button>
             )}
           </div>
-        )}
-      </div>
-      <div className="stage-status">
-        <span className={`status-dot state-${visualState}`} />
-        <strong>{statusLabel}</strong>
-        {avatar.connectionState === "connected" && (
-          <>
-            <span className="avatar-session">数字人媒体已连接</span>
-            <button
-              className="disconnect-button"
-              type="button"
-              onClick={avatar.disconnect}
-            >
-              断开
-            </button>
-          </>
-        )}
-        {metrics && (
-          <span className="metrics">
-            首段音频 {metrics.firstAudioMs ?? "—"} ms · 完整响应 {metrics.totalMs} ms
-          </span>
         )}
       </div>
     </section>

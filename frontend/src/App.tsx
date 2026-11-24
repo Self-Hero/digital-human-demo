@@ -68,30 +68,16 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">AI</span>
-          <div>
-            <h1>实时数字人</h1>
-            <p>智能交互服务</p>
-          </div>
-        </div>
-        <div className="service-summary" aria-live="polite">
-          <span className={`service-state ${access.presenceReady ? "online" : ""}`}>
-            <span className="service-dot" />
-            {access.presenceReady ? "服务在线" : "正在连接"}
-          </span>
-          <span className="summary-divider" />
-          <span>在线 {access.onlineClients}</span>
-          <span>活跃会话 {access.conversationActive ? 1 : 0}</span>
-        </div>
-      </header>
-
-      <div className="workspace">
+      <div
+        className="consultation"
+        data-connected={avatar.connectionState === "connected"}
+        data-state={conversation.state}
+      >
         <DigitalHumanStage
           state={conversation.state}
           metrics={conversation.metrics}
           avatar={controlledAvatar}
+          onlineClients={access.onlineClients}
           conversationBusy={
             access.conversationActive && !access.ownsConversation
           }
@@ -100,16 +86,18 @@ export default function App() {
           reclaimPending={access.reclaimPending}
           onReclaimConversation={access.reclaimInactive}
         />
-        <VoiceControls
-          state={conversation.state}
-          error={conversation.error}
-          microphoneActive={conversation.microphoneActive}
-          onToggleMicrophone={toggleMicrophone}
-          onInterrupt={conversation.interrupt}
-        />
+        <ConversationPanel transcript={conversation.transcript} />
+        {avatar.connectionState === "connected" && (
+          <VoiceControls
+            state={conversation.state}
+            error={conversation.error}
+            microphoneActive={conversation.microphoneActive}
+            onToggleMicrophone={toggleMicrophone}
+            onInterrupt={conversation.interrupt}
+            onDisconnect={disconnectAvatar}
+          />
+        )}
       </div>
-
-      <ConversationPanel transcript={conversation.transcript} />
     </main>
   );
 }
