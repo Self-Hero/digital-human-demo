@@ -79,6 +79,12 @@ class MouthTemporalStabilizer:
             0.03,
             0.35,
         )
+        self.geometry_stabilizer_enabled = _env_enabled(
+            "LIVETALKING_MOUTH_GEOMETRY_STABILIZER", "1"
+        )
+        self.geometry_stabilizer_strength = _env_float(
+            "LIVETALKING_MOUTH_GEOMETRY_STRENGTH", 0.30, 0.0, 0.50
+        )
         self.strength = _env_float(
             "LIVETALKING_MOUTH_STRENGTH", 0.22, 0.0, 0.35
         )
@@ -113,7 +119,8 @@ class MouthTemporalStabilizer:
             "temporal=%s adaptive=%s inner_strength=%.3f optical_flow=%s "
             "strength=%.3f threshold=%.3f transition_frames=%d "
             "batch_seam=(frames=%d strength=%.3f) "
-            "inner_detail=(enabled=%s strength=%.3f threshold=%.3f)",
+            "inner_detail=(enabled=%s strength=%.3f threshold=%.3f) "
+            "geometry_warp=(enabled=%s strength=%.3f)",
             self.local_compositor,
             self.color_match_strength,
             self.sharpen_strength,
@@ -134,6 +141,8 @@ class MouthTemporalStabilizer:
             self.inner_detail_enabled,
             self.inner_detail_strength,
             self.inner_detail_motion_threshold,
+            self.geometry_stabilizer_enabled,
+            self.geometry_stabilizer_strength,
         )
 
     def reset(self) -> None:
@@ -157,6 +166,10 @@ class MouthTemporalStabilizer:
             and (
                 not self.inner_detail_enabled
                 or self.inner_detail_strength <= 0
+            )
+            and (
+                not self.geometry_stabilizer_enabled
+                or self.geometry_stabilizer_strength <= 0
             )
         ):
             return frame
@@ -301,22 +314,52 @@ class MouthTemporalStabilizer:
         current: np.ndarray,
         previous: np.ndarray,
     ) -> np.ndarray:
-        """Stabilize lip and tooth texture without copying prior mouth shape."""
+        """Stabilize inner-mouth geometry and texture without frame buffering."""
+        detail_active = (
+            self.inner_detail_enabled and self.inner_detail_strength > 0
+        )
+        geometry_active = (
+            self.geometry_stabilizer_enabled
+            and self.geometry_stabilizer_strength > 0
+        )
         if (
-            not self.inner_detail_enabled
-            or self.inner_detail_strength <= 0
+            not (detail_active or geometry_active)
             or current.shape != previous.shape
             or current.size == 0
         ):
             return current
 
-        aligned_previous = self._align_previous_detail(
-            previous,
-            current,
-        )
         height, width = current.shape[:2]
-        sigma = max(0.8, min(height, width) * 0.012)
+        mask = self._inner_detail_mask(height, width)
+        flow = self._inner_mouth_flow(previous, current)
         current_float = current.astype(np.float32)
+        if geometry_active:
+            warped_current = self._remap_with_flow(
+                current,
+                flow,
+                -self.geometry_stabilizer_strength,
+            )
+            current_float = (
+                current_float * (1.0 - mask)
+                + warped_current.astype(np.float32) * mask
+            )
+
+        if not detail_active:
+            return np.rint(np.clip(current_float, 0, 255)).astype(np.uint8)
+
+        # Align prior texture to the intermediate geometry rather than all the
+        # way to the original current frame.
+        alignment_scale = (
+            1.0 - self.geometry_stabilizer_strength
+            if geometry_active
+            else 1.0
+        )
+        aligned_previous = self._remap_with_flow(
+            previous,
+            flow,
+            alignment_scale,
+        )
+        sigma = max(0.8, min(height, width) * 0.012)
         previous_float = aligned_previous.astype(np.float32)
         current_low = cv2.GaussianBlur(current_float, (0, 0), sigma)
         previous_low = cv2.GaussianBlur(previous_float, (0, 0), sigma)
@@ -349,7 +392,7 @@ class MouthTemporalStabilizer:
         # high-pass only, so current-frame mouth geometry remains authoritative.
         motion_gain = 0.35 + motion_gain * 0.65
         weight = (
-            self._inner_detail_mask(height, width)[..., 0]
+            mask[..., 0]
             * self.inner_detail_strength
             * motion_gain
         )
@@ -587,6 +630,15 @@ class MouthTemporalStabilizer:
         current: np.ndarray,
     ) -> np.ndarray:
         """Align texture at half resolution to keep realtime CPU cost bounded."""
+        flow = MouthTemporalStabilizer._inner_mouth_flow(previous, current)
+        return MouthTemporalStabilizer._remap_with_flow(previous, flow)
+
+    @staticmethod
+    def _inner_mouth_flow(
+        previous: np.ndarray,
+        current: np.ndarray,
+    ) -> np.ndarray:
+        """Return half-resolution flow from current coordinates to previous."""
         height, width = current.shape[:2]
         small_width = max(16, width // 2)
         small_height = max(16, height // 2)
@@ -622,14 +674,23 @@ class MouthTemporalStabilizer:
         )
         flow[..., 0] *= width / small_width
         flow[..., 1] *= height / small_height
+        return flow
+
+    @staticmethod
+    def _remap_with_flow(
+        image: np.ndarray,
+        flow: np.ndarray,
+        scale: float = 1.0,
+    ) -> np.ndarray:
+        height, width = image.shape[:2]
         grid_x, grid_y = np.meshgrid(
             np.arange(width, dtype=np.float32),
             np.arange(height, dtype=np.float32),
         )
         return cv2.remap(
-            previous,
-            grid_x + flow[..., 0],
-            grid_y + flow[..., 1],
+            image,
+            grid_x + flow[..., 0] * scale,
+            grid_y + flow[..., 1] * scale,
             interpolation=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_REFLECT101,
         )

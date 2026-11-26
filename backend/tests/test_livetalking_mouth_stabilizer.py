@@ -27,6 +27,8 @@ def test_verified_realtime_profile_defaults(monkeypatch) -> None:
     assert stabilizer.transition_frames == 4
     assert stabilizer.inner_detail_enabled
     assert stabilizer.inner_detail_strength == 0.55
+    assert stabilizer.geometry_stabilizer_enabled
+    assert stabilizer.geometry_stabilizer_strength == 0.30
 
 
 def test_local_compositor_preserves_face_outside_mouth(monkeypatch) -> None:
@@ -139,8 +141,10 @@ def test_inner_detail_stabilizer_reduces_texture_flicker_without_shape_blend(
     stabilizer = MouthTemporalStabilizer()
     monkeypatch.setattr(
         stabilizer,
-        "_align_previous_detail",
-        lambda previous, current: previous,
+        "_inner_mouth_flow",
+        lambda previous, current: np.zeros(
+            (*current.shape[:2], 2), dtype=np.float32
+        ),
     )
 
     height, width = 80, 100
@@ -184,6 +188,7 @@ def test_inner_detail_stabilizer_reduces_texture_flicker_without_shape_blend(
 
 def test_inner_detail_stabilizer_can_be_disabled(monkeypatch) -> None:
     monkeypatch.setenv("LIVETALKING_MOUTH_INNER_DETAIL_STABILIZER", "0")
+    monkeypatch.setenv("LIVETALKING_MOUTH_GEOMETRY_STABILIZER", "0")
     stabilizer = MouthTemporalStabilizer()
     current = np.full((40, 50, 3), 200, dtype=np.uint8)
     previous = np.full((40, 50, 3), 40, dtype=np.uint8)
@@ -191,6 +196,30 @@ def test_inner_detail_stabilizer_can_be_disabled(monkeypatch) -> None:
     assert np.array_equal(
         stabilizer._stabilize_inner_detail(current, previous), current
     )
+
+
+def test_geometry_stabilizer_warps_current_toward_previous(monkeypatch) -> None:
+    monkeypatch.setenv("LIVETALKING_MOUTH_INNER_DETAIL_STABILIZER", "0")
+    monkeypatch.setenv("LIVETALKING_MOUTH_GEOMETRY_STABILIZER", "1")
+    monkeypatch.setenv("LIVETALKING_MOUTH_GEOMETRY_STRENGTH", "0.3")
+    stabilizer = MouthTemporalStabilizer()
+    flow = np.zeros((80, 100, 2), dtype=np.float32)
+    flow[..., 0] = -10.0
+    monkeypatch.setattr(
+        stabilizer,
+        "_inner_mouth_flow",
+        lambda previous, current: flow,
+    )
+    previous = np.zeros((80, 100, 3), dtype=np.uint8)
+    current = previous.copy()
+    current[36:44, 51:57] = 255
+
+    result = stabilizer._stabilize_inner_detail(current, previous)
+    current_x = float(np.argwhere(current[..., 0] > 127)[:, 1].mean())
+    result_x = float(np.argwhere(result[..., 0] > 127)[:, 1].mean())
+
+    assert result_x < current_x - 1.0
+    assert np.array_equal(result[:8, :8], current[:8, :8])
 
 
 def test_batch_seam_blends_only_first_two_batch_frames(monkeypatch) -> None:
