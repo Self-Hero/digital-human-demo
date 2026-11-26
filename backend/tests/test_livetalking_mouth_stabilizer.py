@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 
@@ -24,6 +25,8 @@ def test_verified_realtime_profile_defaults(monkeypatch) -> None:
 
     assert stabilizer.motion_threshold == 0.15
     assert stabilizer.transition_frames == 4
+    assert stabilizer.inner_detail_enabled
+    assert stabilizer.inner_detail_strength == 0.55
 
 
 def test_local_compositor_preserves_face_outside_mouth(monkeypatch) -> None:
@@ -126,6 +129,68 @@ def test_adaptive_motion_reacts_fast_and_releases_slowly(monkeypatch) -> None:
 
     assert float(stabilizer._motion_ema.mean()) < float(high_motion.mean())
     assert float(stabilizer._motion_ema.mean()) > 0.0
+
+
+def test_inner_detail_stabilizer_reduces_texture_flicker_without_shape_blend(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("LIVETALKING_MOUTH_INNER_DETAIL_STABILIZER", "1")
+    monkeypatch.setenv("LIVETALKING_MOUTH_INNER_DETAIL_STRENGTH", "0.5")
+    stabilizer = MouthTemporalStabilizer()
+    monkeypatch.setattr(
+        stabilizer,
+        "_align_previous_detail",
+        lambda previous, current: previous,
+    )
+
+    height, width = 80, 100
+    current = np.full((height, width, 3), 128, dtype=np.uint8)
+    previous = current.copy()
+    checker = ((np.indices((24, 40)).sum(axis=0) % 2) * 48 - 24).astype(
+        np.int16
+    )
+    current[28:52, 30:70] = np.clip(
+        current[28:52, 30:70].astype(np.int16) + checker[..., None],
+        0,
+        255,
+    ).astype(np.uint8)
+    previous[28:52, 30:70] = np.clip(
+        previous[28:52, 30:70].astype(np.int16) - checker[..., None],
+        0,
+        255,
+    ).astype(np.uint8)
+
+    result = stabilizer._stabilize_inner_detail(current, previous)
+    current_high = current.astype(np.float32) - cv2.GaussianBlur(
+        current.astype(np.float32), (0, 0), 1.0
+    )
+    previous_high = previous.astype(np.float32) - cv2.GaussianBlur(
+        previous.astype(np.float32), (0, 0), 1.0
+    )
+    result_high = result.astype(np.float32) - cv2.GaussianBlur(
+        result.astype(np.float32), (0, 0), 1.0
+    )
+    center = np.s_[32:48, 35:65]
+
+    before = float(np.mean(np.abs(current_high[center] - previous_high[center])))
+    after = float(np.mean(np.abs(result_high[center] - previous_high[center])))
+    current_low = cv2.GaussianBlur(current.astype(np.float32), (0, 0), 3.0)
+    result_low = cv2.GaussianBlur(result.astype(np.float32), (0, 0), 3.0)
+
+    assert after < before
+    assert float(np.mean(np.abs(result_low - current_low))) < 0.5
+    assert np.array_equal(result[:8, :8], current[:8, :8])
+
+
+def test_inner_detail_stabilizer_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("LIVETALKING_MOUTH_INNER_DETAIL_STABILIZER", "0")
+    stabilizer = MouthTemporalStabilizer()
+    current = np.full((40, 50, 3), 200, dtype=np.uint8)
+    previous = np.full((40, 50, 3), 40, dtype=np.uint8)
+
+    assert np.array_equal(
+        stabilizer._stabilize_inner_detail(current, previous), current
+    )
 
 
 def test_batch_seam_blends_only_first_two_batch_frames(monkeypatch) -> None:
