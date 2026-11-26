@@ -36,6 +36,8 @@ PATCHED_PASTE = """    def paste_back_frame(self,pred_frame,idx:int):
         pred_frame = self.gfpgan_enhancer.resolve_frame(pred_frame)
         bbox = self.coord_list_cycle[idx]
 """
+ASYNC_INFERENCE_MARKER = "self.gfpgan_enhancer.enhance_batch_async(pred)"
+RESOLVE_FRAME_MARKER = "self.gfpgan_enhancer.resolve_frame(pred_frame)"
 APP_IMPORT_ANCHOR = "from utils.logger import logger\n"
 PATCHED_APP_IMPORT = (
     APP_IMPORT_ANCHOR
@@ -60,8 +62,8 @@ def configure(source: Path) -> str:
     if (
         PATCHED_IMPORT in text
         and PATCHED_AVATAR in text
-        and PATCHED_INFERENCE in text
-        and PATCHED_PASTE in text
+        and ASYNC_INFERENCE_MARKER in text
+        and RESOLVE_FRAME_MARKER in text
     ):
         return "already configured"
 
@@ -74,7 +76,7 @@ def configure(source: Path) -> str:
         updated = _replace_once(
             updated, AVATAR_ANCHOR, PATCHED_AVATAR, "mouth stabilizer initialization"
         )
-    if PATCHED_INFERENCE not in updated:
+    if ASYNC_INFERENCE_MARKER not in updated:
         if SYNC_INFERENCE in updated:
             updated = _replace_once(
                 updated, SYNC_INFERENCE, PATCHED_INFERENCE, "synchronous GFPGAN hook"
@@ -83,7 +85,7 @@ def configure(source: Path) -> str:
             updated = _replace_once(
                 updated, INFERENCE_ANCHOR, PATCHED_INFERENCE, "MuseTalk batch decode"
             )
-    if PATCHED_PASTE not in updated:
+    if RESOLVE_FRAME_MARKER not in updated:
         updated = _replace_once(
             updated, PASTE_ANCHOR, PATCHED_PASTE, "MuseTalk paste-back hook"
         )

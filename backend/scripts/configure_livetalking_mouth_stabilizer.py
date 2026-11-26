@@ -33,6 +33,7 @@ PATCHED_BLEND = """        combine_frame = get_image_blending(ori_frame,res_fram
         combine_frame = self.mouth_stabilizer.apply(combine_frame, bbox, ori_frame)
         return combine_frame
 """
+BATCH_SEAM_MARKER = "batch_position=batch_position"
 
 
 def _replace_once(text: str, old: str, new: str, description: str) -> str:
@@ -44,7 +45,9 @@ def _replace_once(text: str, old: str, new: str, description: str) -> str:
 
 def configure(source: Path) -> str:
     text = source.read_text(encoding="utf-8")
-    if PATCHED_IMPORT in text and PATCHED_BLEND in text:
+    if PATCHED_IMPORT in text and (
+        PATCHED_BLEND in text or BATCH_SEAM_MARKER in text
+    ):
         return "already configured"
 
     if PATCHED_IMPORT in text and LEGACY_PATCHED_BLEND in text:

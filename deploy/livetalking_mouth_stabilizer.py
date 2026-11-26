@@ -79,6 +79,12 @@ class MouthTemporalStabilizer:
         self.transition_frames = int(
             _env_float("LIVETALKING_MOUTH_TRANSITION_FRAMES", 4, 0, 12)
         )
+        self.batch_seam_frames = int(
+            _env_float("LIVETALKING_MOUTH_BATCH_SEAM_FRAMES", 2, 0, 4)
+        )
+        self.batch_seam_strength = _env_float(
+            "LIVETALKING_MOUTH_BATCH_SEAM_STRENGTH", 0.50, 0.0, 0.80
+        )
         self._previous: np.ndarray | None = None
         self._last_frame_at = 0.0
         self._transition_index = 0
@@ -92,7 +98,8 @@ class MouthTemporalStabilizer:
             "sharpen=%.3f detail_transfer=%.3f "
             "mask=(cy=%.3f rx=%.3f ry=%.3f feather=%.3f) "
             "temporal=%s adaptive=%s inner_strength=%.3f optical_flow=%s "
-            "strength=%.3f threshold=%.3f transition_frames=%d",
+            "strength=%.3f threshold=%.3f transition_frames=%d "
+            "batch_seam=(frames=%d strength=%.3f)",
             self.local_compositor,
             self.color_match_strength,
             self.sharpen_strength,
@@ -108,6 +115,8 @@ class MouthTemporalStabilizer:
             self.strength,
             self.motion_threshold,
             self.transition_frames,
+            self.batch_seam_frames,
+            self.batch_seam_strength,
         )
 
     def reset(self) -> None:
@@ -121,11 +130,14 @@ class MouthTemporalStabilizer:
         frame: np.ndarray,
         bbox,
         reference_frame: np.ndarray | None = None,
+        batch_position: int | None = None,
     ) -> np.ndarray:
         if self.local_compositor and reference_frame is not None:
             frame = self._composite_local_mouth(frame, reference_frame, bbox)
 
-        if not self.enabled or self.strength <= 0:
+        if not self.enabled or (
+            self.strength <= 0 and self.batch_seam_strength <= 0
+        ):
             return frame
 
         roi_box = self._mouth_box(frame.shape, bbox)
@@ -223,10 +235,44 @@ class MouthTemporalStabilizer:
                     + blended.astype(np.float32) * mask
                 ).clip(0, 255).astype(np.uint8)
 
+        result = self._blend_batch_seam(
+            result,
+            aligned_previous,
+            batch_position,
+        )
         result = self._blend_entry(result, reference_frame, roi_box)
         frame[y1:y2, x1:x2] = result
         self._previous = result
         return frame
+
+    def _blend_batch_seam(
+        self,
+        current: np.ndarray,
+        previous: np.ndarray,
+        batch_position: int | None,
+    ) -> np.ndarray:
+        """Bridge only the first frames of each independently inferred batch."""
+        if (
+            batch_position is None
+            or batch_position < 0
+            or batch_position >= self.batch_seam_frames
+            or self.batch_seam_frames <= 0
+            or self.batch_seam_strength <= 0
+        ):
+            return current
+
+        previous_weight = self.batch_seam_strength * (
+            1.0 - batch_position / self.batch_seam_frames
+        )
+        if previous_weight <= 0.001:
+            return current
+
+        mask = self._soft_mask(current.shape[0], current.shape[1])
+        weight = mask * previous_weight
+        return (
+            current.astype(np.float32) * (1.0 - weight)
+            + previous.astype(np.float32) * weight
+        ).clip(0, 255).astype(np.uint8)
 
     def _composite_local_mouth(
         self,

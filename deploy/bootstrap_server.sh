@@ -559,6 +559,12 @@ cp "${PROJECT_DIR}/deploy/livetalking_gfpgan.py" \
 "${BACKEND_PY}" \
   "${PROJECT_DIR}/backend/scripts/configure_livetalking_gfpgan.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
+"${BACKEND_PY}" \
+  "${PROJECT_DIR}/backend/scripts/configure_livetalking_batch_seams.py" \
+  --livetalking-dir "${LIVETALKING_DIR}"
+"${BACKEND_PY}" \
+  "${PROJECT_DIR}/backend/scripts/configure_livetalking_frame_transitions.py" \
+  --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" "${PROJECT_DIR}/backend/scripts/configure_livetalking_video.py" \
   --livetalking-dir "${LIVETALKING_DIR}"
 "${BACKEND_PY}" \
@@ -617,6 +623,9 @@ Environment=LIVETALKING_MOUTH_DETAIL_TRANSFER=2.0
 Environment=LIVETALKING_MOUTH_STRENGTH=${MOUTH_STRENGTH}
 Environment=LIVETALKING_MOUTH_MOTION_THRESHOLD=0.15
 Environment=LIVETALKING_MOUTH_TRANSITION_FRAMES=4
+Environment=LIVETALKING_MOUTH_BATCH_SEAM_FRAMES=2
+Environment=LIVETALKING_MOUTH_BATCH_SEAM_STRENGTH=0.50
+Environment=LIVETALKING_STATE_TRANSITION_FRAMES=3
 Environment=LIVETALKING_GFPGAN=${ENABLE_GFPGAN}
 Environment=LIVETALKING_GFPGAN_REPO=${DATA_ROOT}/GFPGAN
 Environment=LIVETALKING_GFPGAN_MODEL=${DATA_ROOT}/GFPGAN/experiments/pretrained_models/GFPGANv1.4.pth

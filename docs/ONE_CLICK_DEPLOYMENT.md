@@ -94,6 +94,13 @@ bash deploy/start_avatar.sh --avatar-id ma_renda_dynamic
 只有明确设置 `LIVETALKING_MOUTH_OPTICAL_FLOW=1` 才会启用。
 已验证的实时配置使用 motion threshold `0.15` 和 transition frames `4`。
 
+MuseTalk 每个推理批次都会携带批内帧位置。默认只在新批次的前两帧混合上一帧
+嘴部结果，权重依次为 `50%` 和 `25%`，用于抑制独立音频特征窗口造成的批次接缝，
+不会缓存未来帧。可通过 `LIVETALKING_MOUTH_BATCH_SEAM_FRAMES` 和
+`LIVETALKING_MOUTH_BATCH_SEAM_STRENGTH` 调整或关闭。说话与静音待机画面之间另用
+按帧计数的 3 帧过渡，避免直接切换嘴型；对应参数为
+`LIVETALKING_STATE_TRANSITION_FRAMES`。
+
 默认同时启用 `LIVETALKING_MOUTH_ADAPTIVE=1`：口腔和牙齿中心只做极弱的静态
 去闪，唇线与嘴部外围承担主要时序稳定；局部运动突然增加时会立即降低上一帧权重，
 运动结束后缓慢恢复稳定，避免在阈值附近反复开关。该处理仍不使用未来帧，也不会

@@ -126,3 +126,26 @@ def test_adaptive_motion_reacts_fast_and_releases_slowly(monkeypatch) -> None:
 
     assert float(stabilizer._motion_ema.mean()) < float(high_motion.mean())
     assert float(stabilizer._motion_ema.mean()) > 0.0
+
+
+def test_batch_seam_blends_only_first_two_batch_frames(monkeypatch) -> None:
+    monkeypatch.setenv("LIVETALKING_MOUTH_LOCAL_COMPOSITOR", "0")
+    monkeypatch.setenv("LIVETALKING_MOUTH_STABILIZER", "1")
+    monkeypatch.setenv("LIVETALKING_MOUTH_STRENGTH", "0")
+    monkeypatch.setenv("LIVETALKING_MOUTH_BATCH_SEAM_FRAMES", "2")
+    monkeypatch.setenv("LIVETALKING_MOUTH_BATCH_SEAM_STRENGTH", "0.5")
+
+    stabilizer = MouthTemporalStabilizer()
+    bbox = (10, 10, 90, 90)
+    previous = np.full((100, 100, 3), 40, dtype=np.uint8)
+    current = np.full((100, 100, 3), 200, dtype=np.uint8)
+
+    stabilizer.apply(previous.copy(), bbox, batch_position=7)
+    first = stabilizer.apply(current.copy(), bbox, batch_position=0)
+    second = stabilizer.apply(current.copy(), bbox, batch_position=1)
+    third = stabilizer.apply(current.copy(), bbox, batch_position=2)
+
+    center = (69, 49)
+    assert 118 <= int(first[center].mean()) <= 122
+    assert 178 <= int(second[center].mean()) <= 182
+    assert int(third[center].mean()) == 200
